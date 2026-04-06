@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cicd_repair_env"
+version = "2.0.0"
+description = "A Reinforcement Learning environment for CI/CD pipeline repair."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "CICDRepairEnv Team"}
+]
+dependencies = [
+    "gradio",
+    "pydantic>=2.0.0",
+    "openai",
+    "python-dotenv",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["env*"]

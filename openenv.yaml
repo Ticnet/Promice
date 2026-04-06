@@ -1,0 +1,331 @@
+##############################################################
+# CICDRepairEnv - OpenEnv Specification
+# Compatible with: openenv validate
+# Version: 2.0.0
+##############################################################
+
+name: CICDRepairEnv
+version: "2.0.0"
+description: >
+  A Reinforcement Learning environment that simulates real-world CI/CD pipeline
+  failures with optional stochastic noise and procedural log generation.
+  Agents must diagnose and repair the pipeline by selecting a correct sequence
+  of discrete actions.  Evaluates sequential decision-making, log understanding,
+  memory exploitation, noise robustness, and efficiency.
+
+tags:
+  - openenv
+  - cicd
+  - devops
+  - sequential-decision-making
+  - reinforcement-learning
+  - stochastic
+  - procedural-generation
+
+# ------------------------------------------------------------------
+# Interface
+# ------------------------------------------------------------------
+interface:
+  language: python
+  entry_point: env.cicd_env.CICDRepairEnv
+  methods:
+    reset:
+      signature: "reset(task_id: str = 'tier_1', *, procedural: bool = False) -> Observation"
+      description: "Initialise a fresh episode for the given tier. Returns initial Observation."
+      args:
+        task_id:
+          type: str
+          enum: [tier_1, tier_2, tier_3, easy, medium, hard]
+          default: tier_1
+          description: "Tier ID or legacy alias."
+        procedural:
+          type: bool
+          default: false
+          description: "If true, generate fresh randomised logs per episode."
+    step:
+      signature: "step(action: Action) -> tuple[Observation, float, bool, dict]"
+      description: "Apply one action. Returns (observation, reward, done, info)."
+      args:
+        action:
+          type: Action
+          description: "Pydantic model with field: action_id (int, 0–7)"
+    state:
+      signature: "state() -> EnvironmentState"
+      description: "Return a read-only deep-copy snapshot of the full internal state."
+  constructor:
+    signature: "CICDRepairEnv(stochastic: StochasticConfig | None = None, reward_config: RewardConfig | None = None)"
+    args:
+      stochastic:
+        type: StochasticConfig
+        description: "Optional config controlling sigma and per-event probabilities."
+      reward_config:
+        type: RewardConfig
+        description: "Optional customisation of reward component weights."
+
+# ------------------------------------------------------------------
+# Stochastic Configuration
+# ------------------------------------------------------------------
+stochastic_config:
+  description: >
+    Controls the stochastic transition function.  All event probabilities
+    are scaled by sigma, so sigma=0.0 preserves full determinism.
+  fields:
+    sigma:
+      type: float
+      range: [0.0, 1.0]
+      default: 0.0
+      description: "Master noise scale."
+    seed:
+      type: "int | None"
+      default: null
+      description: "RNG seed for reproducible stochastic episodes."
+    intermittent_failure_prob:
+      type: float
+      default: 0.05
+      description: "Base probability of transient failure on correct action."
+    action_corruption_prob:
+      type: float
+      default: 0.02
+      description: "Base probability of executing a different action than requested."
+    log_noise_prob:
+      type: float
+      default: 0.10
+      description: "Base probability of injecting irrelevant log lines each step."
+
+# ------------------------------------------------------------------
+# Reward Configuration
+# ------------------------------------------------------------------
+reward_config:
+  description: "Formalized, configurable reward component weights."
+  fields:
+    root_cause_bonus:
+      type: float
+      default: 0.20
+    progress_total:
+      type: float
+      default: 0.30
+    efficiency_bonus:
+      type: float
+      default: 0.10
+    success_reward:
+      type: float
+      default: 0.40
+    destructive_penalty:
+      type: float
+      default: 0.10
+
+# ------------------------------------------------------------------
+# Action Space
+# ------------------------------------------------------------------
+action_space:
+  type: Discrete
+  n: 8
+  dtype: int
+  description: "Discrete set of 8 repair actions an agent can apply to the pipeline."
+  actions:
+    - id: 0
+      name: restart_step
+      destructive: false
+    - id: 1
+      name: install_dependency
+      destructive: false
+    - id: 2
+      name: change_version
+      destructive: false
+    - id: 3
+      name: set_env_variable
+      destructive: false
+    - id: 4
+      name: clear_cache
+      destructive: false
+    - id: 5
+      name: rollback
+      destructive: true
+      penalty: -0.10
+    - id: 6
+      name: use_memory_fix
+      destructive: false
+    - id: 7
+      name: ignore_continue
+      destructive: true
+      penalty: -0.10
+
+# ------------------------------------------------------------------
+# Observation Space
+# ------------------------------------------------------------------
+observation_space:
+  type: dict
+  description: "Structured observation returned by reset() and step()."
+  fields:
+    pipeline_stage:
+      dtype: str
+      description: "Current CI/CD stage name (e.g. install_packages)"
+    failure_log:
+      dtype: str
+      description: "Full multi-line raw log (static or procedurally generated)"
+    error_type:
+      dtype: str
+      description: "High-level error category (e.g. ModuleNotFoundError, ABILinkError)"
+    available_actions:
+      dtype: "list[int]"
+      description: "Action IDs available to the agent - always 0-7"
+    memory_hints:
+      dtype: "list[str]"
+      description: "Structured hints extracted from the memory bank (may be empty)"
+    step_count:
+      dtype: int
+      description: "Number of steps taken in the current episode"
+    pipeline_healthy:
+      dtype: bool
+      description: "True only when the pipeline is successfully repaired"
+    progress_pct:
+      dtype: float
+      range: [0.0, 1.0]
+      description: "Fraction of the required repair sequence completed"
+
+# ------------------------------------------------------------------
+# Reward Function
+# ------------------------------------------------------------------
+reward_function:
+  type: dense
+  total_max: 1.0
+  description: >
+    Dense reward distributed across the episode trajectory.
+    Weights are configurable via RewardConfig.
+  components:
+    - name: root_cause_identified
+      value: +0.20
+      condition: "First step where the agent's action matches the required sequence"
+    - name: pipeline_progress
+      value: +0.30
+      distribution: "Evenly split: 0.30 / len(required_sequence) per correct step"
+      condition: "Each correct action in the required sequence"
+    - name: efficiency_bonus
+      value: +0.10
+      condition: "Sequence completed in exactly optimal_steps with zero wrong actions"
+    - name: final_success
+      value: +0.40
+      condition: "Full required_sequence completed before max_steps"
+    - name: destructive_penalty
+      value: -0.10
+      condition: "rollback (5) or ignore_continue (7) used outside required sequence"
+  clamping: "cumulative_reward clamped to [0.0, 1.0] at episode end"
+
+# ------------------------------------------------------------------
+# Tasks (Tiers)
+# ------------------------------------------------------------------
+tasks:
+  - id: tier_1
+    aliases: [easy]
+    name: "Single-Step Dependency Resolution"
+    description: >
+      A Python dependency is missing from the environment. The pipeline fails at
+      install_packages with ModuleNotFoundError. Fix: install the dependency.
+    pipeline_stage: install_packages
+    failure_type: missing_dependency
+    required_sequence: [1]
+    optimal_steps: 1
+    max_steps: 5
+    has_memory_bank: false
+    procedural: true
+    grader: grader.grade_agent
+    score_range: [0.0, 1.0]
+
+  - id: tier_2
+    aliases: [medium]
+    name: "Multi-Step State Manipulation"
+    description: >
+      A stale pip cache causes a version conflict. Fix requires clearing the
+      cache first, then changing the version pin. Action order matters.
+    pipeline_stage: dependency_resolution
+    failure_type: cache_version_conflict
+    required_sequence: [4, 2]
+    optimal_steps: 2
+    max_steps: 8
+    has_memory_bank: false
+    procedural: true
+    grader: grader.grade_agent
+    score_range: [0.0, 1.0]
+
+  - id: tier_3
+    aliases: [hard]
+    name: "Memory-Augmented Patching"
+    description: >
+      A GCC ABI mismatch prevents native extension linking. All standard
+      repair actions fail. The fix is stored exclusively in the memory bank.
+    pipeline_stage: native_extension_build
+    failure_type: abi_mismatch
+    required_sequence: [6]
+    optimal_steps: 1
+    max_steps: 6
+    has_memory_bank: true
+    procedural: true
+    grader: grader.grade_agent
+    score_range: [0.0, 1.0]
+
+  - id: tier_4
+    name: "Distributed State Reconciliation (Planned)"
+    description: >
+      Kubernetes pod deployment failures, container registry auth errors,
+      and service mesh configuration drift. Multi-step distributed repair.
+    status: planned
+    pipeline_stage: container_orchestration
+    failure_type: distributed_state_error
+    required_sequence: []
+    optimal_steps: null
+    max_steps: null
+
+# ------------------------------------------------------------------
+# Evaluation
+# ------------------------------------------------------------------
+evaluation:
+  grader_module: grader
+  functions:
+    - name: grade_agent
+      signature: "grade_agent(agent_fn, difficulty: str, *, stochastic=None, reward_config=None, procedural=False) -> float"
+      description: "Run one episode of given tier, return clamped score in [0, 1]."
+    - name: grade_all
+      signature: "grade_all(agent_fn, *, stochastic=None, reward_config=None, procedural=False) -> dict"
+      description: "Run all tiers, return {tier_1, tier_2, tier_3, average}."
+  agent_fn_signature: "(obs: Observation, state: EnvironmentState) -> Action"
+  score_range: [0.0, 1.0]
+  deterministic_mode: true
+  stochastic_mode: true
+  baseline:
+    script: run_baseline.py
+    agent: rule-based
+    expected_scores:
+      tier_1: 1.0
+      tier_2: 1.0
+      tier_3: 1.0
+      average: 1.0
+  inference:
+    script: inference.py
+    agent: llm
+    env_vars:
+      - API_BASE_URL
+      - MODEL_NAME
+      - HF_TOKEN
+
+# ------------------------------------------------------------------
+# Deployment
+# ------------------------------------------------------------------
+deployment:
+  hf_space: true
+  port: 7860
+  python_version: ">=3.11"
+  dependencies_file: requirements.txt
+  docker:
+    base_image: python:3.11-slim
+    expose_port: 7860
+    default_cmd: python app.py
+  environment_variables:
+    required: []
+    optional:
+      - name: API_BASE_URL
+        description: LLM API endpoint (for inference.py)
+      - name: MODEL_NAME
+        description: Model identifier (for inference.py)
+      - name: HF_TOKEN
+        description: Hugging Face / OpenAI API key (for inference.py)
+  network_access: false
