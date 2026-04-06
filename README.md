@@ -1,3 +1,15 @@
+---
+title: CICDRepairEnv
+emoji: 🔧
+colorFrom: indigo
+colorTo: gray
+sdk: docker
+app_file: server/app.py
+pinned: false
+tags:
+  - openenv
+---
+
 # CICDRepairEnv: An RL Environment for Automated Pipeline Fault Resolution
 
 CICDRepairEnv is a rigorously structured Reinforcement Learning (RL) environment designed to evaluate the sequential decision-making capabilities of autonomous agents - both LLM-based and rule-based - in diagnosing and repairing Continuous Integration/Continuous Deployment (CI/CD) pipeline failures.
