@@ -1,17 +1,28 @@
-# CICDRepairEnv
-
-> A reinforcement learning environment for benchmarking autonomous CI/CD pipeline fault resolution.
-
-CICDRepairEnv models pipeline repair as a sequential decision problem, enabling rigorous evaluation of both LLM-based and rule-based agents across diagnostic, reasoning, and recovery tasks. It ships with a tiered benchmark suite, a configurable reward function, and a stochastic noise layer that simulates real-world CI/CD conditions.
-
+---
+title: CICDRepairEnv
+emoji: 🔧
+colorFrom: indigo
+colorTo: gray
+sdk: docker
+app_file: app.py
+pinned: false
+tags:
+  - openenv
 ---
 
-## Operational Modes
+# CICDRepairEnv: An RL Environment for Automated Pipeline Fault Resolution
 
-| Mode | `sigma` | Behaviour |
-|---|---|---|
-| **Deterministic** | `0` | Identical state-action sequences produce identical transitions and rewards. Suited for zero-variance benchmarking. |
-| **Stochastic** | `> 0` | Injects intermittent failures, action corruption, and log noise at probabilities scaled by `sigma ∈ [0, 1]`. |
+CICDRepairEnv is a rigorously structured Reinforcement Learning (RL) environment designed to evaluate the sequential decision-making capabilities of autonomous agents - both LLM-based and rule-based - in diagnosing and repairing Continuous Integration/Continuous Deployment (CI/CD) pipeline failures.
+
+### Motivation
+In modern software engineering, CI/CD pipelines are the backbone of delivery. However, pipeline failures are frequent, often transient, and require significant human intervention to diagnose from unstructured logs. **CICDRepairEnv** fills the gap for a standardized, real-world benchmark that evaluates whether agents can understand logs, exploit external memory patches, and perform sequential repairs without human assistance.
+
+The environment supports **two operational modes**:
+
+| Mode | Description |
+|---|---|
+| **Deterministic** (sigma = 0) | Identical state-action sequences yield identical transitions and rewards. Zero-variance benchmarking. |
+| **Stochastic** (sigma > 0) | Introduces real-world CI/CD noise: intermittent failures, action corruption, and log noise injection. Scaled by the master noise parameter sigma in [0, 1]. |
 
 Procedural log generation randomises package names, versions, timestamps, and file paths at each episode, preventing agents from overfitting to static strings while preserving semantic error markers.
 
@@ -137,7 +148,7 @@ Active when `sigma > 0`. Effective probability scales linearly with `sigma`.
 
 Tasks are organised into tiers of increasing structural complexity. New failure classes can be introduced by defining a new tier.
 
-### Tier 1 — Single-Step Dependency Resolution
+### Tier 1: Single-Step Dependency Resolution (Difficulty: Easy)
 
 | Property | Value |
 |---|---|
@@ -146,7 +157,7 @@ Tasks are organised into tiers of increasing structural complexity. New failure 
 | **Optimal Policy** | `[install_dependency]` |
 | **Complexity** | 1 step — tests basic log-to-action mapping. |
 
-### Tier 2 — Multi-Step State Manipulation
+### Tier 2: Multi-Step State Manipulation (Difficulty: Medium)
 
 | Property | Value |
 |---|---|
@@ -155,7 +166,7 @@ Tasks are organised into tiers of increasing structural complexity. New failure 
 | **Optimal Policy** | `[clear_cache]` → `[change_version]` |
 | **Complexity** | 2 steps — tests strict sequential ordering. |
 
-### Tier 3 — Memory-Augmented Patching
+### Tier 3: Memory-Augmented Patching (Difficulty: Hard)
 
 | Property | Value |
 |---|---|
@@ -237,3 +248,16 @@ print(f"Final Execution Score: {info['cumulative_reward']}")
 ```
 
 ---
+---
+
+## 8. Backward Compatibility
+
+Legacy task IDs are fully supported as aliases during environment reset:
+
+| Legacy ID | Canonical ID |
+|---|---|
+| `"easy"` | `"tier_1"` |
+| `"medium"` | `"tier_2"` |
+| `"hard"` | `"tier_3"` |
+
+`CICDRepairEnv()` with no arguments produces **exactly the same** deterministic behaviour as the original implementation.

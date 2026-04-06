@@ -16,7 +16,11 @@ dependencies = [
     "pydantic>=2.0.0",
     "openai",
     "python-dotenv",
+    "openenv-core>=0.2.0",
 ]
+
+[project.scripts]
+cicd-repair-server = "app:demo.launch"
 
 [tool.setuptools.packages.find]
 where = ["."]

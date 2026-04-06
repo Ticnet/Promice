@@ -37,7 +37,7 @@ from env.models import Observation, EnvironmentState, ACTION_NAMES
 # ---------------------------------------------------------------------------
 API_BASE_URL: str = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME:   str = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
-API_KEY:       str = os.environ.get("HF_TOKEN",     os.environ.get("OPENAI_API_KEY", ""))
+API_KEY:       str = os.environ.get("HF_TOKEN") or os.environ.get("OPENAI_API_KEY") or ""
 
 BENCHMARK   = "CICDRepairEnv"
 MAX_STEPS   = 10            # hard cap per episode

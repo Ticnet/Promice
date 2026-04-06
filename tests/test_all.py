@@ -39,7 +39,7 @@ def test_deterministic_trajectory_tier1():
     assert obs1.failure_log == obs2.failure_log, "Static logs must be identical"
     assert r1 == r2, f"Rewards differ: {r1} vs {r2}"
     assert d1 == d2
-    print("  ✅ test_deterministic_trajectory_tier1")
+    print("   test_deterministic_trajectory_tier1")
 
 
 def test_deterministic_trajectory_tier2():
@@ -56,7 +56,7 @@ def test_deterministic_trajectory_tier2():
 
     assert r1 == r1b and r2 == r2b
     assert d2 == d2b == True
-    print("  ✅ test_deterministic_trajectory_tier2")
+    print("   test_deterministic_trajectory_tier2")
 
 
 def test_backward_compat_aliases():
@@ -68,7 +68,7 @@ def test_backward_compat_aliases():
         obs_c = env_c.reset(canonical)
         assert obs_a.failure_log == obs_c.failure_log, f"Alias '{alias}' differs from '{canonical}'"
         assert obs_a.error_type == obs_c.error_type
-    print("  ✅ test_backward_compat_aliases")
+    print("   test_backward_compat_aliases")
 
 
 def test_resolve_task_id():
@@ -76,7 +76,7 @@ def test_resolve_task_id():
     assert resolve_task_id("medium") == "tier_2"
     assert resolve_task_id("hard") == "tier_3"
     assert resolve_task_id("tier_1") == "tier_1"
-    print("  ✅ test_resolve_task_id")
+    print("   test_resolve_task_id")
 
 
 # =========================================================================
@@ -91,7 +91,7 @@ def test_sigma_zero_is_deterministic():
     obs1 = env1.reset("tier_1")
     obs2 = env2.reset("tier_1")
     assert obs1.failure_log == obs2.failure_log
-    print("  ✅ test_sigma_zero_is_deterministic")
+    print("   test_sigma_zero_is_deterministic")
 
 
 def test_stochastic_variance():
@@ -109,7 +109,7 @@ def test_stochastic_variance():
     # (intermittent failures or action corruption)
     # Even if variance is rare, the test passes if we get at least one different outcome
     assert len(outcomes) >= 1, "Expected at least some outcome"
-    print(f"  ✅ test_stochastic_variance (found {len(outcomes)} distinct outcomes)")
+    print(f"   test_stochastic_variance (found {len(outcomes)} distinct outcomes)")
 
 
 def test_same_seed_reproducible():
@@ -130,7 +130,7 @@ def test_same_seed_reproducible():
         if d1:
             break
 
-    print("  ✅ test_same_seed_reproducible")
+    print("   test_same_seed_reproducible")
 
 
 # =========================================================================
@@ -145,7 +145,7 @@ def test_procedural_logs_differ_per_seed():
         log = generate_log("tier_1", rng)
         logs.add(log)
     assert len(logs) > 1, "Procedural logs should differ across seeds"
-    print(f"  ✅ test_procedural_logs_differ_per_seed ({len(logs)} unique logs)")
+    print(f"   test_procedural_logs_differ_per_seed ({len(logs)} unique logs)")
 
 
 def test_procedural_logs_preserve_semantics():
@@ -158,7 +158,7 @@ def test_procedural_logs_preserve_semantics():
         rng = random.Random(42)
         log = generate_log(tier, rng)
         assert marker.lower() in log.lower(), f"Tier {tier} log missing '{marker}'"
-    print("  ✅ test_procedural_logs_preserve_semantics")
+    print("   test_procedural_logs_preserve_semantics")
 
 
 def test_procedural_reset():
@@ -171,7 +171,7 @@ def test_procedural_reset():
     obs1 = env1.reset("tier_1", procedural=True)
     obs2 = env2.reset("tier_1", procedural=True)
     assert obs1.failure_log != obs2.failure_log, "Procedural logs with different seeds should differ"
-    print("  ✅ test_procedural_reset")
+    print("   test_procedural_reset")
 
 
 # =========================================================================
@@ -181,15 +181,17 @@ def test_procedural_reset():
 def test_tier_ids_exist():
     for tier in TIER_IDS:
         assert tier in TASKS, f"Missing tier: {tier}"
-    print("  ✅ test_tier_ids_exist")
+    print("   test_tier_ids_exist")
 
 
 def test_all_tiers_solvable():
     """Baseline agent scores 1.0 on all tiers in deterministic mode."""
     results = grade_all(baseline_agent)
+    mapping = {"tier_1": "easy", "tier_2": "medium", "tier_3": "hard"}
     for tier in TIER_IDS:
-        assert results[tier] == 1.0, f"Tier {tier} scored {results[tier]}, expected 1.0"
-    print(f"  ✅ test_all_tiers_solvable (scores: {results})")
+        diff_key = mapping[tier]
+        assert results[diff_key] == 1.0, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected 1.0"
+    print(f"   test_all_tiers_solvable (scores: {results})")
 
 
 # =========================================================================
@@ -204,7 +206,7 @@ def test_custom_reward_config():
     _, reward, _, _ = env.step(Action(action_id=1))
     # Should get: root_cause(0.50) + progress(0.10/1) + success(0.40) + efficiency(0.10) = 1.10
     assert reward > 0.9, f"Expected high reward with boosted root cause, got {reward}"
-    print(f"  ✅ test_custom_reward_config (reward={reward})")
+    print(f"   test_custom_reward_config (reward={reward})")
 
 
 # =========================================================================

@@ -63,9 +63,9 @@ if __name__ == "__main__":
     results = grade_all(baseline_agent)
 
     print("\n=== CICDRepairEnv — Baseline Agent Results ===")
-    print(f"  Tier 1  : {results['tier_1']}")
-    print(f"  Tier 2  : {results['tier_2']}")
-    print(f"  Tier 3  : {results['tier_3']}")
+    print(f"  Easy    : {results['easy']}")
+    print(f"  Medium  : {results['medium']}")
+    print(f"  Hard    : {results['hard']}")
     print(f"  ─────────────────────────────────")
     print(f"  Average : {results['average']}")
     print("================================================\n")

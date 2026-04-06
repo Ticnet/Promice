@@ -1,0 +1,15 @@
+.git/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ipynb_checkpoints/
+.history/
+.vscode/
+.idea/
+*.log
+*.sqlite

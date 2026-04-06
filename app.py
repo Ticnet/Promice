@@ -76,7 +76,7 @@ def run_baseline_all(session: dict) -> str:
     lines = ["### Baseline Agent Results\n"]
     for k, v in results.items():
         bar = "X" * int(v * 20)
-        label = k.replace("tier_", "Tier ").capitalize()
+        label = k.replace("tier_", "Tier ").replace("_", " ").capitalize()
         lines.append(f"**{label:10s}**: `{v:.4f}`  `{bar}`")
     return "\n".join(lines)
 
@@ -152,9 +152,9 @@ def _render_state(state, session, last_reward, last_action):
 ACTION_CHOICES = [f"{aid}: {name}" for aid, name in ACTION_NAMES.items()]
 
 TIER_DESCRIPTIONS = {
-    "tier_1": "Tier 1 - Single-Step Dependency Resolution (ModuleNotFoundError)",
-    "tier_2": "Tier 2 - Multi-Step State Manipulation (cache/version conflict)",
-    "tier_3": "Tier 3 - Memory-Augmented Patching (ABI mismatch, memory fix required)",
+    "easy":   "Easy - Single-Step Dependency Resolution (ModuleNotFoundError)",
+    "medium": "Medium - Multi-Step State Manipulation (cache/version conflict)",
+    "hard":   "Hard - Memory-Augmented Patching (ABI mismatch, memory fix required)",
 }
 
 with gr.Blocks(
@@ -174,7 +174,7 @@ Earn rewards for correct actions; destructive actions lose points.
         with gr.Column(scale=1):
             task_dropdown = gr.Dropdown(
                 choices=list(TIER_DESCRIPTIONS.keys()),
-                value="tier_1",
+                value="easy",
                 label="Task Tier",
                 info="\n".join(TIER_DESCRIPTIONS.values()),
             )

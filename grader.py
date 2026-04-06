@@ -16,11 +16,15 @@ from __future__ import annotations
 from typing import Callable
 
 from env import CICDRepairEnv, Action
-from env.models import Observation, EnvironmentState
+from env.models import Observation, EnvironmentState, StochasticConfig, RewardConfig
+from env.tasks import TIER_IDS
 
 
 # Type alias for agent callables
 AgentFn = Callable[[Observation, EnvironmentState], Action]
+
+# Canonical tier IDs (backward-compat aliases resolved inside CICDRepairEnv.reset)
+_TIERS = TIER_IDS
 
 _DIFFICULTIES = ("easy", "medium", "hard")
 
@@ -29,26 +33,36 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, value))
 
 
-def grade_agent(agent_fn: AgentFn, difficulty: str) -> float:
+def grade_agent(
+    agent_fn: AgentFn,
+    difficulty: str,
+    *,
+    stochastic: StochasticConfig | None = None,
+    reward_config: RewardConfig | None = None,
+    procedural: bool = False,
+) -> float:
     """
     Run a single episode of the given difficulty and return the final score.
 
     The agent is called as: agent_fn(obs, env.state()) -> Action
 
     Args:
-        agent_fn:   Callable accepting (Observation, EnvironmentState) → Action.
-        difficulty: One of "easy", "medium", "hard".
+        agent_fn:      Callable accepting (Observation, EnvironmentState) → Action.
+        difficulty:    Tier ID ("tier_1"/"tier_2"/"tier_3") or alias ("easy"/"medium"/"hard").
+        stochastic:    Optional stochastic config (sigma > 0 for noisy episodes).
+        reward_config: Optional reward weight overrides.
+        procedural:    If True, use procedurally-generated logs.
 
     Returns:
         Final normalised score in [0.0, 1.0].
     """
-    if difficulty not in _DIFFICULTIES:
+    if difficulty not in _DIFFICULTIES and difficulty not in _TIERS:
         raise ValueError(
-            f"Unknown difficulty '{difficulty}'. Valid options: {list(_DIFFICULTIES)}"
+            f"Unknown difficulty '{difficulty}'. Valid options: {list(_DIFFICULTIES)} or {list(_TIERS)}"
         )
 
-    env = CICDRepairEnv()
-    obs = env.reset(difficulty)
+    env = CICDRepairEnv(stochastic=stochastic, reward_config=reward_config)
+    obs = env.reset(difficulty, procedural=procedural)
 
     while True:
         action = agent_fn(obs, env.state())
@@ -60,7 +74,13 @@ def grade_agent(agent_fn: AgentFn, difficulty: str) -> float:
     return round(final_score, 4)
 
 
-def grade_all(agent_fn: AgentFn) -> dict[str, float]:
+def grade_all(
+    agent_fn: AgentFn,
+    *,
+    stochastic: StochasticConfig | None = None,
+    reward_config: RewardConfig | None = None,
+    procedural: bool = False,
+) -> dict[str, float]:
     """
     Run the agent on all three difficulties and return a summary.
 
@@ -69,7 +89,12 @@ def grade_all(agent_fn: AgentFn) -> dict[str, float]:
     """
     results: dict[str, float] = {}
     for difficulty in _DIFFICULTIES:
-        results[difficulty] = grade_agent(agent_fn, difficulty)
+        results[difficulty] = grade_agent(
+            agent_fn, difficulty,
+            stochastic=stochastic,
+            reward_config=reward_config,
+            procedural=procedural,
+        )
 
     results["average"] = round(
         sum(results[d] for d in _DIFFICULTIES) / len(_DIFFICULTIES), 4
