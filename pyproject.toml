@@ -17,10 +17,12 @@ dependencies = [
     "openai",
     "python-dotenv",
     "openenv-core>=0.2.0",
+    "fastapi",
+    "uvicorn",
 ]
 
 [project.scripts]
-cicd-repair-server = "app:demo.launch"
+server = "server.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

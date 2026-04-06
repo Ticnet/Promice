@@ -33,4 +33,4 @@ USER cicd
 # Default: run Gradio UI (HF Spaces)
 # For CLI baseline: docker run ... python run_baseline.py
 # For inference:    docker run -e HF_TOKEN=xxx -e MODEL_NAME=gpt-4o-mini -e API_BASE_URL=https://api.openai.com/v1 ... python inference.py
-CMD ["python", "app.py"]
+CMD ["python", "server/app.py"]

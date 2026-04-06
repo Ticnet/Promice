@@ -236,7 +236,6 @@ print(f"Final Execution Score: {info['cumulative_reward']}")
 ```
 
 ---
----
 
 ## 8. Backward Compatibility
 

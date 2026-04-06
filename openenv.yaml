@@ -318,7 +318,7 @@ deployment:
   docker:
     base_image: python:3.11-slim
     expose_port: 7860
-    default_cmd: python app.py
+    default_cmd: python server/app.py
   environment_variables:
     required: []
     optional:

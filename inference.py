@@ -35,9 +35,12 @@ from env.models import Observation, EnvironmentState, ACTION_NAMES
 # ---------------------------------------------------------------------------
 # Config — read from environment variables
 # ---------------------------------------------------------------------------
-API_BASE_URL: str = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME:   str = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
-API_KEY:       str = os.environ.get("HF_TOKEN") or os.environ.get("OPENAI_API_KEY") or ""
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME",   "gpt-4o-mini")
+HF_TOKEN     = os.getenv("HF_TOKEN")
+
+# Use HF_TOKEN as the primary API key
+API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or ""
 
 BENCHMARK   = "CICDRepairEnv"
 MAX_STEPS   = 10            # hard cap per episode
@@ -50,27 +53,21 @@ TASKS = ["easy", "medium", "hard"]
 # Structured log helpers  — MUST follow [START] / [STEP] / [END] format exactly
 # ---------------------------------------------------------------------------
 
-def log_start(*, task: str, env: str, model: str) -> None:
-    payload = json.dumps({"task": task, "env": env, "model": model}, ensure_ascii=False)
+def log_start(*, task_id: str) -> None:
+    payload = json.dumps({"benchmark": BENCHMARK, "task_id": task_id}, ensure_ascii=False)
     print(f"[START] {payload}", flush=True)
 
 
-def log_step(*, step: int, action: str, reward: float, done: bool,
-             error: Optional[str] = None) -> None:
+def log_step(*, step: int, action: int, reward: float, done: bool) -> None:
     payload = json.dumps(
-        {"step": step, "action": action, "reward": round(reward, 4),
-         "done": done, "error": error},
+        {"step": step, "action": action, "reward": round(reward, 4), "done": done},
         ensure_ascii=False,
     )
     print(f"[STEP] {payload}", flush=True)
 
 
-def log_end(*, success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    payload = json.dumps(
-        {"success": success, "steps": steps,
-         "score": round(score, 4), "rewards": [round(r, 4) for r in rewards]},
-        ensure_ascii=False,
-    )
+def log_end(*, total_reward: float) -> None:
+    payload = json.dumps({"total_reward": round(total_reward, 4)}, ensure_ascii=False)
     print(f"[END] {payload}", flush=True)
 
 
@@ -166,8 +163,7 @@ def call_llm(client: OpenAI, system: str, user: str) -> int:
 
 def run_episode(client: OpenAI, task_id: str) -> float:
     """Run one episode and return score in [0, 1]."""
-    task_name = f"{BENCHMARK}/{task_id}"
-    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task_id=task_id)
 
     env = CICDRepairEnv()
     obs = env.reset(task_id)
@@ -200,7 +196,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             steps_taken = step
             history.append(f"Step {step}: {action_name} -> reward {reward:+.4f}")
 
-            log_step(step=step, action=action_name, reward=reward, done=done, error=error)
+            log_step(step=step, action=action_id, reward=reward, done=done)
 
             if done:
                 break
@@ -208,15 +204,13 @@ def run_episode(client: OpenAI, task_id: str) -> float:
         cumulative = env.state().cumulative_reward
         score = min(max(cumulative, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
+        score = min(max(env.state().cumulative_reward, 0.0), 1.0)
 
     except Exception as exc:
         print(f"[DEBUG] Episode error: {exc}", flush=True)
-        error_str = str(exc)
-        rewards = rewards or [0.0]
-        log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=error_str)
-
     finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        cum = env.state().cumulative_reward
+        log_end(total_reward=cum)
 
     return score
 
