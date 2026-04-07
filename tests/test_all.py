@@ -194,6 +194,17 @@ def test_all_tiers_solvable():
     print(f"   test_all_tiers_solvable (scores: {results})")
 
 
+def test_failing_agent_score():
+    """Verify that an agent that does nothing gets a low score (0.01)."""
+    # Dummy agent that only restarts (no progress)
+    def dummy_agent(obs, info): return Action(action_id=0)
+
+    score = grade_agent(dummy_agent, "tier_1")
+    # Raw reward 0.0 -> normalized 0.01
+    assert score == 0.01, f"Expected 0.01 for failing agent, got {score}"
+    print(f"   test_failing_agent_score (score: {score})")
+
+
 # =========================================================================
 # 5. REWARD CONFIG TESTS
 # =========================================================================
@@ -235,6 +246,7 @@ if __name__ == "__main__":
     print("\n4. Tier Naming Tests")
     test_tier_ids_exist()
     test_all_tiers_solvable()
+    test_failing_agent_score()
 
     print("\n5. Reward Config Tests")
     test_custom_reward_config()
