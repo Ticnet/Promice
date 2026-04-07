@@ -30,7 +30,9 @@ _DIFFICULTIES = ("easy", "medium", "hard")
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
-    return max(lo, min(hi, value))
+    clamped_raw = max(lo, min(hi, value))
+    # Normalize from [0.0, 1.0] to [0.01, 0.99] space
+    return 0.01 + (clamped_raw * 0.98)
 
 
 def grade_agent(

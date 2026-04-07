@@ -105,7 +105,6 @@ def take_action(action_id_str: str, session: dict) -> tuple:
 
     action_id = int(action_id_str.split(":")[0].strip())
     action = Action(action_id=action_id)
-    obs, reward, done, info = env.step(action)
     session["total_reward"] += reward
     session["done"] = done
 
@@ -137,7 +136,7 @@ def _render(obs, session: dict, last_reward, last_action: str | None) -> tuple:
 | **Stage** | `{obs.pipeline_stage}` |
 | **Error Type** | `{obs.error_type}` |
 | **Progress** | `{progress_bar}` {obs.progress_pct:.0%} |
-| **Cumulative Reward** | `{session['total_reward']:.4f}` |
+| **Cumulative Reward** | `{0.01 + (min(max(session['total_reward'], 0.0), 1.0) * 0.98):.4f}` |
 | **Status** | {status_icon} |
 """
     hints_md = "### Memory Hints\n" + ("\n".join(f"- {h}" for h in obs.memory_hints) if obs.memory_hints else "*None*")

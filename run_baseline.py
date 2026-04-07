@@ -5,10 +5,10 @@ The baseline uses simple log-pattern matching and observation fields
 to deterministically solve all three tiers with a perfect score.
 
 Expected output (deterministic mode):
-    Tier 1 : 1.0
-    Tier 2 : 1.0
-    Tier 3 : 1.0
-    Average: 1.0
+    Tier 1 : 0.99
+    Tier 2 : 0.99
+    Tier 3 : 0.99
+    Average: 0.99
 """
 
 from __future__ import annotations

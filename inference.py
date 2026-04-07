@@ -202,9 +202,8 @@ def run_episode(client: OpenAI, task_id: str) -> float:
                 break
 
         cumulative = env.state().cumulative_reward
-        score = min(max(cumulative, 0.0), 1.0)
+        score = 0.01 + (min(max(cumulative, 0.0), 1.0) * 0.98)
         success = score >= SUCCESS_SCORE_THRESHOLD
-        score = min(max(env.state().cumulative_reward, 0.0), 1.0)
 
     except Exception as exc:
         print(f"[DEBUG] Episode error: {exc}", flush=True)

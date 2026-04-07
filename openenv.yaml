@@ -295,10 +295,10 @@ evaluation:
     script: run_baseline.py
     agent: rule-based
     expected_scores:
-      tier_1: 1.0
-      tier_2: 1.0
-      tier_3: 1.0
-      average: 1.0
+      tier_1: 0.99
+      tier_2: 0.99
+      tier_3: 0.99
+      average: 0.99
   inference:
     script: inference.py
     agent: llm
