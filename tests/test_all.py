@@ -19,7 +19,7 @@ from env.models import Observation, EnvironmentState
 from env.tasks import TASKS, TIER_IDS, resolve_task_id
 from env.procedural import generate_log
 from run_baseline import baseline_agent
-from grader import grade_agent, grade_all
+from grader import grade_agent, grade_all, _normalize_rows
 
 
 # =========================================================================
@@ -221,6 +221,29 @@ def test_custom_reward_config():
 
 
 # =========================================================================
+# 6. ROW NORMALIZATION TESTS
+# =========================================================================
+
+def test_normalize_rows():
+    """Verify row/key invariance and float rounding."""
+    rows1 = [
+        {"id": 1, "value": 10.556, "name": "A"},
+        {"id": 2, "value": 20.0, "name": "B"},
+    ]
+    # Scrambled keys and rows, with slightly different float precision
+    rows2 = [
+        {"name": "B", "id": 2, "value": 20.0001},
+        {"value": 10.5601, "id": 1, "name": "A"},
+    ]
+
+    norm1 = _normalize_rows(rows1)
+    norm2 = _normalize_rows(rows2)
+
+    assert norm1 == norm2
+    print("   test_normalize_rows")
+
+
+# =========================================================================
 # Runner
 # =========================================================================
 
@@ -250,5 +273,8 @@ if __name__ == "__main__":
 
     print("\n5. Reward Config Tests")
     test_custom_reward_config()
+
+    print("\n6. Row Normalization Tests")
+    test_normalize_rows()
 
     print("\n=== All tests passed! ===\n")

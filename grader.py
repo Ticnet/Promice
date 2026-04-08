@@ -13,7 +13,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Any, List, Dict
 
 from env import CICDRepairEnv, Action, normalize_reward
 from env.models import Observation, EnvironmentState, StochasticConfig, RewardConfig
@@ -28,6 +28,21 @@ _TIERS = TIER_IDS
 
 _DIFFICULTIES = ("easy", "medium", "hard")
 
+def _normalize_rows(rows: List[Dict]) -> List[tuple]:
+    """
+    Normalise a list of dictionaries for invariant comparison.
+    Rounds floats to 2 decimal places and sorts by keys/rows.
+    """
+    def normalize_val(v: Any) -> str:
+        if isinstance(v, float):
+            return str(round(v, 2))
+        return str(v)
+
+    normalized = [
+        tuple(sorted((k, normalize_val(v)) for k, v in row.items()))
+        for row in rows
+    ]
+    return sorted(normalized)
 
 
 
