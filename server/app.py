@@ -62,9 +62,12 @@ async def step_api(payload: dict = Body(...)):
         obs, reward, done, info = _SINGLETON_ENV.step(action)
         return {
             "observation": obs.model_dump(),
-            "reward": round(reward, 4),
+            "reward": round(normalize_reward(reward), 4),
             "done": done,
-            "info": info
+            "info": {
+                **info,
+                "cumulative_reward": normalize_reward(info["cumulative_reward"])
+            }
         }
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -73,7 +76,9 @@ async def step_api(payload: dict = Body(...)):
 async def state_api():
     """Get internal state via API."""
     try:
-        return _SINGLETON_ENV.state().model_dump()
+        state_data = _SINGLETON_ENV.state().model_dump()
+        state_data["cumulative_reward"] = normalize_reward(state_data["cumulative_reward"])
+        return state_data
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
