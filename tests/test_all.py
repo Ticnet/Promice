@@ -190,7 +190,7 @@ def test_all_tiers_solvable():
     mapping = {"tier_1": "easy", "tier_2": "medium", "tier_3": "hard"}
     for tier in TIER_IDS:
         diff_key = mapping[tier]
-        assert results[diff_key] == 0.99, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected 0.99"
+        assert results[diff_key] == 0.9, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected 0.9"
     print(f"   test_all_tiers_solvable (scores: {results})")
 
 
@@ -200,8 +200,8 @@ def test_failing_agent_score():
     def dummy_agent(obs, info): return Action(action_id=0)
 
     score = grade_agent(dummy_agent, "tier_1")
-    # Raw reward 0.0 -> normalized 0.01
-    assert score == 0.01, f"Expected 0.01 for failing agent, got {score}"
+    # Raw reward 0.0 -> normalized 0.1
+    assert score == 0.1, f"Expected 0.1 for failing agent, got {score}"
     print(f"   test_failing_agent_score (score: {score})")
 
 

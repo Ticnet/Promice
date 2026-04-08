@@ -49,7 +49,7 @@ CICDRepairEnv implements a discrete-time **Markov Decision Process (MDP)**:
 | **State Space** $S$ | Structured observation: pipeline stage, raw failure logs, error type, memory hints, progress metrics. |
 | **Action Space** $A$ | 8 discrete remediation actions. |
 | **Transition Function** $T$ | Parameterised by `sigma`. Deterministic when `sigma = 0`; stochastic events are sampled at `sigma`-scaled probabilities when `sigma > 0`. |
-| **Reward Function** $R$ | Dense, configurable via `RewardConfig`. Normalised to $R \in [0.01,\ 0.99]$ for stable evaluation. |
+| **Reward Function** $R$ | Dense, configurable via `RewardConfig`. Normalised to $R \in [0.1,\ 0.9]$ for stable evaluation. |
 
 ---
 
@@ -122,9 +122,9 @@ At each timestep $t$, the environment emits $s_t$ containing:
  
  $$R_{\text{raw}} = \min\!\left(1.0,\ \max\!\left(0.0,\ R_{\text{root}} + R_{\text{prog}} + R_{\text{eff}} + R_{\text{term}} - P_{\text{dest}}\right)\right)$$
  
- $$R_{\text{final}} = 0.01 + (R_{\text{raw}} \times 0.98)$$
+ $$R_{\text{final}} = 0.1 + (R_{\text{raw}} \times 0.8)$$
  
- The environment uses a **normalized scoring range** $[0.01, 0.99]$ to ensure reactivity and prevent absolute zero/unity artifacts in agent evaluation.
+ The environment uses a **normalized scoring range** $[0.1, 0.9]$ to ensure reactivity and prevent absolute zero/unity artifacts in agent evaluation.
 
 | Component | Symbol | Default | Condition |
 |---|---|---|---|
@@ -170,14 +170,14 @@ Tasks are organised into tiers of increasing structural complexity. New failure 
 | **Optimal Policy** | `[clear_cache]` → `[change_version]` |
 | **Complexity** | 2 steps — tests strict sequential ordering. |
 
-### Tier 3: Memory-Augmented Patching (Difficulty: Hard)
+### Tier 3: Memory-Augmented Multi-Step Patching (Difficulty: Hard)
 
 | Property | Value |
 |---|---|
 | **Failure Vector** | Linker failure due to GCC ABI mismatch. |
 | **Target Stage** | `native_extension_build` |
-| **Optimal Policy** | `[use_memory_fix]` |
-| **Complexity** | Tests the ability to exploit external memory contexts. |
+| **Optimal Policy** | `[set_env_variable]` → `[clear_cache]` → `[use_memory_fix]` |
+| **Complexity** | 3 steps — tests strict sequential ordering, log interpretation, and memory exploitation. |
 
 ### Tier 4 — Distributed State Reconciliation *(Planned)*
 

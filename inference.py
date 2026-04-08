@@ -180,7 +180,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
-    score = 0.0
+    score = 0.1
     success = False
 
     try:
@@ -200,12 +200,12 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             action_name = ACTION_NAMES[action_id]
             error: Optional[str] = None
 
-            rewards.append(reward)
+            norm_reward = normalize_reward(reward)
+            rewards.append(norm_reward)
             steps_taken = step
-            history.append(f"Step {step}: {action_name} -> reward {reward:+.4f}")
+            history.append(f"Step {step}: {action_name} -> reward {norm_reward:+.4f}")
 
-            # log_step(step=step, action=message, reward=reward, done=done, error=error)
-            log_step(step=step, action=action_name, reward=reward, done=done, error=error)
+            log_step(step=step, action=action_name, reward=norm_reward, done=done, error=error)
 
             if done:
                 break

@@ -62,7 +62,7 @@ async def step_api(payload: dict = Body(...)):
         obs, reward, done, info = _SINGLETON_ENV.step(action)
         return {
             "observation": obs.model_dump(),
-            "reward": round(normalize_reward(reward), 4),
+            "reward": round(reward, 4),
             "done": done,
             "info": {
                 **info,
@@ -110,6 +110,7 @@ def take_action(action_id_str: str, session: dict) -> tuple:
 
     action_id = int(action_id_str.split(":")[0].strip())
     action = Action(action_id=action_id)
+    obs, reward, done, info = env.step(action)
     session["total_reward"] += reward
     session["done"] = done
 

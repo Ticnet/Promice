@@ -32,13 +32,23 @@ def baseline_agent(obs: Observation, state: EnvironmentState) -> Action:
     log = obs.failure_log.lower()
     error_type = obs.error_type.lower()
 
-    # Priority 1: ABI mismatch — memory fix is the only correct action.
+    # Priority 1: ABI mismatch — 3-step sequence: set_env_variable → clear_cache → use_memory_fix
     if "abi" in log or "abilink" in error_type or "abi_mismatch" in error_type:
-        return Action(action_id=6)  # use_memory_fix
+        if state.sequence_position == 0:
+            return Action(action_id=3)  # set_env_variable (step 1)
+        elif state.sequence_position == 1:
+            return Action(action_id=4)  # clear_cache (step 2)
+        else:
+            return Action(action_id=6)  # use_memory_fix (step 3)
 
     # Also catch tasks where memory_hints reference ABI / memory fix
     if obs.memory_hints and ("abi" in " ".join(obs.memory_hints).lower()):
-        return Action(action_id=6)  # use_memory_fix
+        if state.sequence_position == 0:
+            return Action(action_id=3)  # set_env_variable (step 1)
+        elif state.sequence_position == 1:
+            return Action(action_id=4)  # clear_cache (step 2)
+        else:
+            return Action(action_id=6)  # use_memory_fix (step 3)
 
     # Priority 2: cache + version conflict (tier_2, 2-step sequence)
     if "cache" in log and ("version" in log or "conflict" in log):
