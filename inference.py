@@ -29,7 +29,7 @@ from openai import OpenAI
 # Bring the local env package onto the path when run from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from env import CICDRepairEnv, Action, normalize_reward
+from env import CICDRepairEnv, Action, compute_episode_score
 from env.models import Observation, EnvironmentState, ACTION_NAMES
 
 # ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
-    score = 0.1
+    score = 0.13
     success = False
 
     try:
@@ -200,17 +200,17 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             action_name = ACTION_NAMES[action_id]
             error: Optional[str] = None
 
-            norm_reward = normalize_reward(reward)
-            rewards.append(norm_reward)
+            episode_score = compute_episode_score(env.state())
+            rewards.append(episode_score)
             steps_taken = step
-            history.append(f"Step {step}: {action_name} -> reward {norm_reward:+.4f}")
+            history.append(f"Step {step}: {action_name} -> reward {episode_score:+.4f}")
 
-            log_step(step=step, action=action_name, reward=norm_reward, done=done, error=error)
+            log_step(step=step, action=action_name, reward=episode_score, done=done, error=error)
 
             if done:
                 break
 
-        score = normalize_reward(env.state().cumulative_reward)
+        score = compute_episode_score(env.state())
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as exc:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Callable, Any, List, Dict
 
-from env import CICDRepairEnv, Action, normalize_reward
+from env import CICDRepairEnv, Action, compute_episode_score
 from env.models import Observation, EnvironmentState, StochasticConfig, RewardConfig
 from env.tasks import TIER_IDS
 
@@ -83,7 +83,7 @@ def grade_agent(
         if done:
             break
 
-    final_score = normalize_reward(env.state().cumulative_reward)
+    final_score = compute_episode_score(env.state())
     return final_score
 
 

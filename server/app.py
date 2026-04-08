@@ -21,7 +21,7 @@ import uvicorn
 # Ensure root components are importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from env import CICDRepairEnv, Action, StochasticConfig, normalize_reward
+from env import CICDRepairEnv, Action, StochasticConfig, compute_episode_score
 from env.models import ACTION_NAMES, DESTRUCTIVE_ACTION_IDS
 from grader import grade_all
 from run_baseline import baseline_agent
@@ -60,13 +60,14 @@ async def step_api(payload: dict = Body(...)):
         action_id = int(payload["action_id"])
         action = Action(action_id=action_id)
         obs, reward, done, info = _SINGLETON_ENV.step(action)
+        score = compute_episode_score(_SINGLETON_ENV.state())
         return {
             "observation": obs.model_dump(),
-            "reward": round(normalize_reward(reward), 4),
+            "reward": round(score, 4),
             "done": done,
             "info": {
                 **info,
-                "cumulative_reward": normalize_reward(info["cumulative_reward"])
+                "cumulative_reward": score
             }
         }
     except Exception as e:
@@ -76,8 +77,9 @@ async def step_api(payload: dict = Body(...)):
 async def state_api():
     """Get internal state via API."""
     try:
-        state_data = _SINGLETON_ENV.state().model_dump()
-        state_data["cumulative_reward"] = normalize_reward(state_data["cumulative_reward"])
+        st = _SINGLETON_ENV.state()
+        state_data = st.model_dump()
+        state_data["cumulative_reward"] = compute_episode_score(st)
         return state_data
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -142,7 +144,7 @@ def _render(obs, session: dict, last_reward, last_action: str | None) -> tuple:
 | **Stage** | `{obs.pipeline_stage}` |
 | **Error Type** | `{obs.error_type}` |
 | **Progress** | `{progress_bar}` {obs.progress_pct:.0%} |
-| **Cumulative Reward** | `{normalize_reward(session['total_reward']):.4f}` |
+| **Cumulative Reward** | `{compute_episode_score(env.state()):.4f}` |
 | **Status** | {status_icon} |
 """
     hints_md = "### Memory Hints\n" + ("\n".join(f"- {h}" for h in obs.memory_hints) if obs.memory_hints else "*None*")

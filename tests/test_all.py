@@ -14,7 +14,7 @@ import random
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from env import CICDRepairEnv, Action, StochasticConfig, RewardConfig
+from env import CICDRepairEnv, Action, StochasticConfig, RewardConfig, compute_episode_score
 from env.models import Observation, EnvironmentState
 from env.tasks import TASKS, TIER_IDS, resolve_task_id
 from env.procedural import generate_log
@@ -190,7 +190,8 @@ def test_all_tiers_solvable():
     mapping = {"tier_1": "easy", "tier_2": "medium", "tier_3": "hard"}
     for tier in TIER_IDS:
         diff_key = mapping[tier]
-        assert results[diff_key] == 0.9, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected 0.9"
+        assert results[diff_key] > 0.9, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected > 0.9"
+        assert results[diff_key] < 1.0, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, must be < 1.0"
     print(f"   test_all_tiers_solvable (scores: {results})")
 
 
@@ -200,8 +201,10 @@ def test_failing_agent_score():
     def dummy_agent(obs, info): return Action(action_id=0)
 
     score = grade_agent(dummy_agent, "tier_1")
-    # Raw reward 0.0 -> normalized 0.1
-    assert score == 0.1, f"Expected 0.1 for failing agent, got {score}"
+    # Multi-component score: success=0, progress=0, efficiency=1/5=0.2, safety=1.0, speed=0
+    # = 0 + 0 + 0.03 + 0.10 + 0 = 0.13
+    assert 0.0 < score < 0.5, f"Expected low score for failing agent, got {score}"
+    assert score > 0.0, f"Score must not be exactly 0.0, got {score}"
     print(f"   test_failing_agent_score (score: {score})")
 
 

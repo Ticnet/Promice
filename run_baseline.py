@@ -4,11 +4,11 @@ run_baseline.py — Rule-based baseline agent for CICDRepairEnv.
 The baseline uses simple log-pattern matching and observation fields
 to deterministically solve all three tiers with a perfect score.
 
-Expected output (deterministic mode):
-    Tier 1 : 0.99
-    Tier 2 : 0.99
-    Tier 3 : 0.99
-    Average: 0.99
+Expected output (deterministic mode, multi-component scoring):
+    Tier 1 : ~0.98   (1 step,  optimal=1, max=5)
+    Tier 2 : ~0.975  (2 steps, optimal=2, max=8)
+    Tier 3 : ~0.97   (3 steps, optimal=3, max=10)
+    Average: ~0.975
 """
 
 from __future__ import annotations
