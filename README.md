@@ -136,18 +136,7 @@ At each timestep $t$, the environment emits $s_t$ containing:
 
 All weights are overridable via `RewardConfig`.
 
-### 4.4 Tabular Data Normalization
-
-For tasks requiring the agent to extract and report structured data, the grader provides the `_normalize_rows` utility. This ensures that comparison against ground truth is invariant to row order and key order, while handling floating-point precision consistently.
-
-```python
-from grader import _normalize_rows
-
-normalized = _normalize_rows(agent_output_rows)
-# Rounds floats to 2 decimal places, sorts rows and keys, returns stable list of tuples.
-```
-
-### 4.5 Stochastic Transition Events
+### 4.4 Stochastic Transition Events
 
 Active when `sigma > 0`. Effective probability scales linearly with `sigma`.
 
