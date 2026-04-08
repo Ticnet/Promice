@@ -229,7 +229,7 @@ tasks:
     has_memory_bank: false
     procedural: true
     grader: grader.grade_agent
-    score_range: [0.02, 0.98]
+    score_range: [0.1, 0.9]
 
   - id: tier_2
     aliases: [medium]

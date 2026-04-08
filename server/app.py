@@ -62,7 +62,7 @@ async def step_api(payload: dict = Body(...)):
         obs, reward, done, info = _SINGLETON_ENV.step(action)
         return {
             "observation": obs.model_dump(),
-            "reward": round(reward, 4),
+            "reward": round(normalize_reward(reward), 4),
             "done": done,
             "info": {
                 **info,
