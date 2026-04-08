@@ -4,8 +4,7 @@ import os
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from env import CICDRepairEnv, Action
-from grader import _clamp
+from env import CICDRepairEnv, Action, normalize_reward
 
 def run_demo():
     print("="*60)
@@ -24,7 +23,7 @@ def run_demo():
         # Tier 1 requires action_id=1
         _, r, d, _ = env.step(Action(action_id=1))
         raw_perfect = env.state().cumulative_reward
-        norm_perfect = _clamp(raw_perfect)
+        norm_perfect = normalize_reward(raw_perfect)
         print(f" [PERFECT]: Raw={raw_perfect:.2f} | Normalized={norm_perfect:.4f} (0.99 Expected)")
 
         # 2. PARTIAL AGENT (Takes one correct action but doesn't finish)
@@ -35,7 +34,7 @@ def run_demo():
         # Tier 2 sequence is [4, 2]. Let's only do [4].
         env.step(Action(action_id=4)) 
         raw_partial = env.state().cumulative_reward
-        norm_partial = _clamp(raw_partial)
+        norm_partial = normalize_reward(raw_partial)
         print(f" [PARTIAL]: Raw={raw_partial:.2f} | Normalized={norm_partial:.4f}")
 
         # 3. FAILING AGENT (Zero correct actions)
@@ -44,7 +43,7 @@ def run_demo():
         # Incorrect action for Tier 1
         env.step(Action(action_id=0)) 
         raw_fail = env.state().cumulative_reward
-        norm_fail = _clamp(raw_fail)
+        norm_fail = normalize_reward(raw_fail)
         print(f" [FAILING]: Raw={raw_fail:.2f} | Normalized={norm_fail:.4f} (0.01 Expected)")
 
     print("\n" + "="*60)

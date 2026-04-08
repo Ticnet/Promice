@@ -229,7 +229,7 @@ tasks:
     has_memory_bank: false
     procedural: true
     grader: grader.grade_agent
-    score_range: [0.0, 1.0]
+    score_range: [0.01, 0.99]
 
   - id: tier_2
     aliases: [medium]
@@ -245,7 +245,7 @@ tasks:
     has_memory_bank: false
     procedural: true
     grader: grader.grade_agent
-    score_range: [0.0, 1.0]
+    score_range: [0.01, 0.99]
 
   - id: tier_3
     aliases: [hard]
@@ -261,7 +261,7 @@ tasks:
     has_memory_bank: true
     procedural: true
     grader: grader.grade_agent
-    score_range: [0.0, 1.0]
+    score_range: [0.01, 0.99]
 
   - id: tier_4
     name: "Distributed State Reconciliation (Planned)"
@@ -288,7 +288,7 @@ evaluation:
       signature: "grade_all(agent_fn, *, stochastic=None, reward_config=None, procedural=False) -> dict"
       description: "Run all tiers, return {tier_1, tier_2, tier_3, average}."
   agent_fn_signature: "(obs: Observation, state: EnvironmentState) -> Action"
-  score_range: [0.0, 1.0]
+  score_range: [0.01, 0.99]
   deterministic_mode: true
   stochastic_mode: true
   baseline:

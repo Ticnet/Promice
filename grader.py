@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from env import CICDRepairEnv, Action
+from env import CICDRepairEnv, Action, normalize_reward
 from env.models import Observation, EnvironmentState, StochasticConfig, RewardConfig
 from env.tasks import TIER_IDS
 
@@ -29,10 +29,6 @@ _TIERS = TIER_IDS
 _DIFFICULTIES = ("easy", "medium", "hard")
 
 
-def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
-    clamped_raw = max(lo, min(hi, value))
-    # Normalize from [0.0, 1.0] to [0.01, 0.99] space
-    return 0.01 + (clamped_raw * 0.98)
 
 
 def grade_agent(
@@ -72,8 +68,8 @@ def grade_agent(
         if done:
             break
 
-    final_score = _clamp(env.state().cumulative_reward)
-    return round(final_score, 4)
+    final_score = normalize_reward(env.state().cumulative_reward)
+    return final_score
 
 
 def grade_all(

@@ -29,7 +29,7 @@ from openai import OpenAI
 # Bring the local env package onto the path when run from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from env import CICDRepairEnv, Action
+from env import CICDRepairEnv, Action, normalize_reward
 from env.models import Observation, EnvironmentState, ACTION_NAMES
 
 # ---------------------------------------------------------------------------
@@ -54,20 +54,28 @@ TASKS = ["easy", "medium", "hard"]
 # ---------------------------------------------------------------------------
 
 def log_start(*, task_id: str) -> None:
-    payload = json.dumps({"benchmark": BENCHMARK, "task_id": task_id}, ensure_ascii=False)
+    payload = json.dumps({"task": task_id, "env": BENCHMARK, "model": MODEL_NAME}, ensure_ascii=False)
     print(f"[START] {payload}", flush=True)
 
 
-def log_step(*, step: int, action: int, reward: float, done: bool) -> None:
+def log_step(*, step: int, action: str, reward: float, done: bool, error: str | None = None) -> None:
     payload = json.dumps(
-        {"step": step, "action": action, "reward": round(reward, 4), "done": done},
+        {"step": step, "action": action, "reward": round(reward, 4), "done": done, "error": error},
         ensure_ascii=False,
     )
     print(f"[STEP] {payload}", flush=True)
 
 
-def log_end(*, total_reward: float) -> None:
-    payload = json.dumps({"total_reward": round(total_reward, 4)}, ensure_ascii=False)
+def log_end(*, success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    payload = json.dumps(
+        {
+            "success": success,
+            "steps": steps,
+            "score": round(score, 4),
+            "rewards": [round(r, 4) for r in rewards],
+        },
+        ensure_ascii=False,
+    )
     print(f"[END] {payload}", flush=True)
 
 
@@ -196,20 +204,19 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             steps_taken = step
             history.append(f"Step {step}: {action_name} -> reward {reward:+.4f}")
 
-            log_step(step=step, action=action_id, reward=reward, done=done)
+            # log_step(step=step, action=message, reward=reward, done=done, error=error)
+            log_step(step=step, action=action_name, reward=reward, done=done, error=error)
 
             if done:
                 break
 
-        cumulative = env.state().cumulative_reward
-        score = 0.01 + (min(max(cumulative, 0.0), 1.0) * 0.98)
+        score = normalize_reward(env.state().cumulative_reward)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as exc:
         print(f"[DEBUG] Episode error: {exc}", flush=True)
     finally:
-        cum = env.state().cumulative_reward
-        log_end(total_reward=cum)
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
     return score
 

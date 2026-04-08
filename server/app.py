@@ -21,7 +21,7 @@ import uvicorn
 # Ensure root components are importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from env import CICDRepairEnv, Action, StochasticConfig
+from env import CICDRepairEnv, Action, StochasticConfig, normalize_reward
 from env.models import ACTION_NAMES, DESTRUCTIVE_ACTION_IDS
 from grader import grade_all
 from run_baseline import baseline_agent
@@ -136,7 +136,7 @@ def _render(obs, session: dict, last_reward, last_action: str | None) -> tuple:
 | **Stage** | `{obs.pipeline_stage}` |
 | **Error Type** | `{obs.error_type}` |
 | **Progress** | `{progress_bar}` {obs.progress_pct:.0%} |
-| **Cumulative Reward** | `{0.01 + (min(max(session['total_reward'], 0.0), 1.0) * 0.98):.4f}` |
+| **Cumulative Reward** | `{normalize_reward(session['total_reward']):.4f}` |
 | **Status** | {status_icon} |
 """
     hints_md = "### Memory Hints\n" + ("\n".join(f"- {h}" for h in obs.memory_hints) if obs.memory_hints else "*None*")

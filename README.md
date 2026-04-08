@@ -229,7 +229,7 @@ while True:
 ## 7. Agent Integration API
 
 ```python
-from env import CICDRepairEnv, Action, StochasticConfig, RewardConfig
+from env import CICDRepairEnv, Action, StochasticConfig, RewardConfig, normalize_reward
 from env.models import Observation, EnvironmentState
 
 # Deterministic mode (backward-compatible)
@@ -248,7 +248,7 @@ while not done:
     action = optimized_policy(obs, env.state())
     obs, reward, done, info = env.step(action)
 
-print(f"Final Execution Score: {0.01 + (info['cumulative_reward'] * 0.98):.4f}")
+print(f"Final Execution Score: {normalize_reward(info['cumulative_reward']):.4f}")
 ```
 
 ---
