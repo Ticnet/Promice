@@ -200,12 +200,15 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             action_name = ACTION_NAMES[action_id]
             error: Optional[str] = None
 
+            # With the new server logic, 'reward' is already the incremental normalized delta
+            incremental_reward = reward
             episode_score = compute_episode_score(env.state())
-            rewards.append(episode_score)
+            
+            rewards.append(incremental_reward)
             steps_taken = step
-            history.append(f"Step {step}: {action_name} -> reward {episode_score:+.4f}")
+            history.append(f"Step {step}: {action_name} -> reward {incremental_reward:+.4f}")
 
-            log_step(step=step, action=action_name, reward=episode_score, done=done, error=error)
+            log_step(step=step, action=action_name, reward=incremental_reward, done=done, error=error)
 
             if done:
                 break

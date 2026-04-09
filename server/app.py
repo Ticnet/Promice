@@ -31,6 +31,7 @@ from run_baseline import baseline_agent
 # ---------------------------------------------------------------------------
 
 _SINGLETON_ENV = CICDRepairEnv()
+_LAST_SCORE = 0.15  # Starting point of the [0.15, 0.85] range
 
 # ---------------------------------------------------------------------------
 # FastAPI Endpoints (OpenEnv Headless API)
@@ -50,24 +51,32 @@ async def reset_api(payload: dict = Body({})):
     else:
         _SINGLETON_ENV._stochastic = StochasticConfig()
 
+    global _LAST_SCORE
     obs = _SINGLETON_ENV.reset(task_id, procedural=procedural)
+    _LAST_SCORE = 0.0
     return obs.model_dump()
 
 @app.post("/step")
 async def step_api(payload: dict = Body(...)):
     """Apply an action via API."""
+    global _LAST_SCORE
     try:
         action_id = int(payload["action_id"])
         action = Action(action_id=action_id)
-        obs, reward, done, info = _SINGLETON_ENV.step(action)
-        score = compute_episode_score(_SINGLETON_ENV.state())
+        obs, _raw_reward, done, info = _SINGLETON_ENV.step(action)
+        
+        current_score = compute_episode_score(_SINGLETON_ENV.state())
+        incremental_reward = round(current_score - _LAST_SCORE, 4)
+        _LAST_SCORE = current_score
+        
         return {
             "observation": obs.model_dump(),
-            "reward": round(score, 4),
+            "reward": incremental_reward,
             "done": done,
             "info": {
                 **info,
-                "cumulative_reward": score
+                "cumulative_reward": current_score,
+                "incremental_reward": incremental_reward
             }
         }
     except Exception as e:

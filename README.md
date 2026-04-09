@@ -21,10 +21,10 @@ The environment supports **two operational modes**:
 
 | Mode | Description |
 |---|---|
-| **Deterministic** (sigma = 0) | Identical state-action sequences yield identical transitions and rewards. Zero-variance benchmarking. |
-| **Stochastic** (sigma > 0) | Introduces real-world CI/CD noise: intermittent failures, action corruption, and log noise injection. Scaled by the master noise parameter sigma in [0, 1]. |
+| **Deterministic** | (Default) Identical state-action sequences yield zero-variance benchmarking. |
+| **Stochastic** | (Advanced) Optional noise injection (sigma > 0) to evaluate agent robustness against flaky runners. |
 
-Procedural log generation randomises package names, versions, timestamps, and file paths at each episode, preventing agents from overfitting to static strings while preserving semantic error markers.
+Procedural log generation randomises package names, versions, and paths at each episode. This is an **optional high-utility feature** that prevents agents from overfitting to static strings while preserving semantic error markers.
 
 ---
 
