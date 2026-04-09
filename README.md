@@ -49,7 +49,7 @@ CICDRepairEnv implements a discrete-time **Markov Decision Process (MDP)**:
 | **State Space** $S$ | Structured observation: pipeline stage, raw failure logs, error type, memory hints, progress metrics. |
 | **Action Space** $A$ | 8 discrete remediation actions. |
 | **Transition Function** $T$ | Parameterised by `sigma`. Deterministic when `sigma = 0`; stochastic events are sampled at `sigma`-scaled probabilities when `sigma > 0`. |
-| **Reward Function** $R$ | Dense, configurable via `RewardConfig`. Normalised to $R \in [0.1,\ 0.9]$ for stable evaluation. |
+| **Reward Function** $R$ | Dense, configurable via `RewardConfig`. Normalised to $R \in [0.15,\ 0.85]$ for stable evaluation. |
 
 ---
 
@@ -122,9 +122,9 @@ At each timestep $t$, the environment emits $s_t$ containing:
  
  $$R_{\text{raw}} = \min\!\left(1.0,\ \max\!\left(0.0,\ R_{\text{root}} + R_{\text{prog}} + R_{\text{eff}} + R_{\text{term}} - P_{\text{dest}}\right)\right)$$
  
- $$R_{\text{final}} = 0.1 + (R_{\text{raw}} \times 0.8)$$
+ $$R_{\text{final}} = 0.15 + (R_{\text{raw}} \times 0.7)$$
  
- The environment uses a **normalized scoring range** $[0.1, 0.9]$ to ensure reactivity and prevent absolute zero/unity artifacts in agent evaluation.
+ The environment uses a **normalized scoring range** $[0.15, 0.85]$ to ensure reactivity and prevent absolute zero/unity artifacts in agent evaluation.
 
 | Component | Symbol | Default | Condition |
 |---|---|---|---|

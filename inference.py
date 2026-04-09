@@ -180,7 +180,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
-    score = 0.13
+    score = 0.1
     success = False
 
     try:
