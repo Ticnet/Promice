@@ -41,13 +41,24 @@ from env.procedural import generate_log, generate_noise_line, generate_memory_hi
 # Helpers
 # ---------------------------------------------------------------------------
 
-def normalize_reward(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
+def normalize_score(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     """
-    Normalise a raw reward into the strict OpenEnv (0, 1) exclusive range.
+    Normalise a raw reward/score into the strict OpenEnv (0, 1) exclusive range.
     Formula: 0.15 + (clamped_raw * 0.7)  →  range [0.15, 0.85]
+    
+    This range is strictly within (0, 1), satisfying Phase 2 validation.
     """
     clamped_raw = max(lo, min(hi, value))
     return round(0.15 + (clamped_raw * 0.7), 4)
+
+
+def normalize_step_reward(raw: float) -> float:
+    """
+    Map raw step rewards (approx [-0.2, 1.2]) to a safe (0.1, 0.9) range.
+    Ensures no negative rewards are logged, satisfying Phase 2 validation.
+    """
+    clamped = max(-0.2, min(1.2, raw))
+    return round(0.1 + ((clamped + 0.2) / 1.4) * 0.8, 4)
 
 
 def compute_episode_score(state: EnvironmentState) -> float:
@@ -94,7 +105,7 @@ def compute_episode_score(state: EnvironmentState) -> float:
         + safety * 0.10
         + speed * 0.10
     )
-    return normalize_reward(raw_sum)
+    return normalize_score(raw_sum)
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -377,17 +388,20 @@ class CICDRepairEnv:
         obs = _build_observation(state)
 
         # Build info dict
+        normalized_step_reward = normalize_step_reward(step_reward)
+        current_cumulative_score = compute_episode_score(state)
+        
         info = {
             "step_count":        state.step_count,
             "sequence_position": state.sequence_position,
             "action_taken":      action_id,
             "action_correct":    (expected is not None and action_id == expected),
-            "cumulative_reward": compute_episode_score(state),
+            "cumulative_reward": current_cumulative_score,
             "done":              state.done,
             "pipeline_healthy":  state.pipeline_healthy,
         }
 
-        return obs, step_reward, state.done, info
+        return obs, normalized_step_reward, state.done, info
 
     def state(self) -> EnvironmentState:
         """Return a copy of the current internal state (read-only snapshot)."""

@@ -53,30 +53,31 @@ TASKS = ["easy", "medium", "hard"]
 # Structured log helpers  — MUST follow [START] / [STEP] / [END] format exactly
 # ---------------------------------------------------------------------------
 
-def log_start(*, task_id: str) -> None:
-    payload = json.dumps({"task": task_id, "env": BENCHMARK, "model": MODEL_NAME}, ensure_ascii=False)
-    print(f"[START] {payload}", flush=True)
+def _one(value: object) -> str:
+    """Clean string for space-separated log parsing."""
+    return " ".join(str(value).split())
+
+
+def log_start(*, task_id: str, env: str, model: str) -> None:
+    print(f"[START] task={_one(task_id)} env={_one(env)} model={_one(model)}", flush=True)
 
 
 def log_step(*, step: int, action: str, reward: float, done: bool, error: str | None = None) -> None:
-    payload = json.dumps(
-        {"step": step, "action": action, "reward": round(reward, 4), "done": done, "error": error},
-        ensure_ascii=False,
+    err = _one(error) if error else "null"
+    print(
+        f"[STEP] step={step} action={_one(action)} "
+        f"reward={reward:.4f} done={str(done).lower()} error={err}",
+        flush=True,
     )
-    print(f"[STEP] {payload}", flush=True)
 
 
 def log_end(*, success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    payload = json.dumps(
-        {
-            "success": success,
-            "steps": steps,
-            "score": round(score, 4),
-            "rewards": [round(r, 4) for r in rewards],
-        },
-        ensure_ascii=False,
+    rewards_str = ",".join(f"{r:.4f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.4f} rewards={rewards_str}",
+        flush=True,
     )
-    print(f"[END] {payload}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -169,10 +170,12 @@ def call_llm(client: OpenAI, system: str, user: str) -> int:
 # Single episode runner
 # ---------------------------------------------------------------------------
 
-def run_episode(client: OpenAI, task_id: str) -> float:
-    """Run one episode and return score in [0, 1]."""
-    log_start(task_id=task_id)
+def run_episode(client: OpenAI, task_id: str, seed: int = 42) -> dict:
+    """Run one episode and return a dictionary of results."""
+    log_start(task_id=task_id, env=BENCHMARK, model=MODEL_NAME)
 
+    # Note: CICDRepairEnv doesn't use the seed in deterministic mode, 
+    # but we pass it for structural compatibility with OpenEnv 2.0.0 scripts.
     env = CICDRepairEnv()
     obs = env.reset(task_id)
 
@@ -182,6 +185,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     steps_taken = 0
     score = 0.15
     success = False
+
 
     try:
         for step in range(1, MAX_STEPS + 1):
@@ -200,16 +204,14 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             action_name = ACTION_NAMES[action_id]
             error: Optional[str] = None
 
-            # With the new server logic, 'reward' is already the incremental normalized delta
-            prev_score = score
+            # 'reward' is now the normalized step reward from the environment
             score = compute_episode_score(env.state())
-            incremental_reward = round(score - prev_score, 4)
             
-            rewards.append(incremental_reward)
+            rewards.append(reward)
             steps_taken = step
-            history.append(f"Step {step}: {action_name} -> reward {incremental_reward:+.4f}")
+            history.append(f"Step {step}: {action_name} -> reward {reward:+.4f}")
 
-            log_step(step=step, action=action_name, reward=incremental_reward, done=done, error=error)
+            log_step(step=step, action=action_name, reward=reward, done=done, error=error)
 
             if done:
                 break
@@ -222,7 +224,14 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
-    return score
+    return {
+        "task": task_id,
+        "seed": seed,
+        "success": success,
+        "steps": steps_taken,
+        "score": score,
+        "rewards": rewards,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -241,12 +250,21 @@ def main() -> None:
     print(f"{'='*55}", flush=True)
 
     results: dict[str, float] = {}
+    final_output_results = []
+    
     for task_id in TASKS:
-        print(f"\n--- Running task: {task_id} ---", flush=True)
-        score = run_episode(client, task_id)
-        results[task_id] = score
-        print(f"  Score ({task_id}): {score:.4f}", flush=True)
-        time.sleep(0.5)   # brief pause between tasks
+        # Each task has a default seed for reproducibility
+        seed_map = {"easy": 11, "medium": 21, "hard": 31}
+        seed = seed_map.get(task_id, 42)
+        
+        print(f"\n--- Running task: {task_id} (seed={seed}) ---", flush=True)
+        episode_result = run_episode(client, task_id, seed=seed)
+        
+        results[task_id] = episode_result["score"]
+        final_output_results.append(episode_result)
+        
+        print(f"  Score ({task_id}): {episode_result['score']:.4f}", flush=True)
+        time.sleep(1.0)   # pause between tasks
 
     avg = sum(results.values()) / len(results)
     results["average"] = round(avg, 4)
@@ -259,6 +277,26 @@ def main() -> None:
     print(f"  {'─'*20}", flush=True)
     print(f"  Average : {results['average']:.4f}", flush=True)
     print(f"{'='*55}\n", flush=True)
+
+    # -----------------------------------------------------------------------
+    # Dump results for Phase 2 Deep Validation
+    # -----------------------------------------------------------------------
+    output = {
+        "model": MODEL_NAME,
+        "benchmark": BENCHMARK,
+        "results": final_output_results,
+    }
+
+    from pathlib import Path
+    import tempfile
+    
+    output_path = Path("artifacts/results/inference_results.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.NamedTemporaryFile("w", dir=output_path.parent, delete=False, suffix=".tmp") as tmp:
+        json.dump(output, tmp, indent=2)
+        tmp_path = Path(tmp.name)
+    tmp_path.replace(output_path)
 
 
 if __name__ == "__main__":

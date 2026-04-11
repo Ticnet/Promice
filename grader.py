@@ -77,14 +77,18 @@ def grade_agent(
     env = CICDRepairEnv(stochastic=stochastic, reward_config=reward_config)
     obs = env.reset(difficulty, procedural=procedural)
 
-    while True:
-        action = agent_fn(obs, env.state())
-        obs, _reward, done, _info = env.step(action)
-        if done:
-            break
+    try:
+        while True:
+            action = agent_fn(obs, env.state())
+            obs, _reward, done, _info = env.step(action)
+            if done:
+                break
+    except Exception as e:
+        # If the agent crashes, terminate the episode
+        env._state.done = True
 
     final_score = compute_episode_score(env.state())
-    return final_score
+    return float(final_score)
 
 
 def grade_all(

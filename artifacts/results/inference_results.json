@@ -1,0 +1,56 @@
+{
+  "model": "gpt-4o-mini",
+  "benchmark": "CICDRepairEnv",
+  "results": [
+    {
+      "task": "easy",
+      "seed": 11,
+      "success": false,
+      "steps": 5,
+      "score": 0.241,
+      "rewards": [
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143
+      ]
+    },
+    {
+      "task": "medium",
+      "seed": 21,
+      "success": false,
+      "steps": 8,
+      "score": 0.2462,
+      "rewards": [
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143
+      ]
+    },
+    {
+      "task": "hard",
+      "seed": 31,
+      "success": false,
+      "steps": 10,
+      "score": 0.2515,
+      "rewards": [
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143,
+        0.2143
+      ]
+    }
+  ]
+}

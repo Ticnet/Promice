@@ -2,7 +2,7 @@
 CICDRepairEnv — Public API
 """
 
-from env.cicd_env import CICDRepairEnv, normalize_reward, compute_episode_score
+from env.cicd_env import CICDRepairEnv, normalize_score, compute_episode_score
 from env.models import (
     Action,
     Observation,
@@ -14,7 +14,7 @@ from env.models import (
 
 __all__ = [
     "CICDRepairEnv",
-    "normalize_reward",
+    "normalize_score",
     "compute_episode_score",
     "Action",
     "Observation",
