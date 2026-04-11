@@ -53,7 +53,7 @@ async def reset_api(payload: dict = Body({})):
 
     global _LAST_SCORE
     obs = _SINGLETON_ENV.reset(task_id, procedural=procedural)
-    _LAST_SCORE = 0.0
+    _LAST_SCORE = 0.15
     return obs.model_dump()
 
 @app.post("/step")

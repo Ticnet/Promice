@@ -44,8 +44,8 @@ API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or ""
 
 BENCHMARK   = "CICDRepairEnv"
 MAX_STEPS   = 10            # hard cap per episode
-MAX_TOTAL_REWARD = 1.0
-SUCCESS_SCORE_THRESHOLD = 0.8
+MAX_TOTAL_REWARD = 0.85
+SUCCESS_SCORE_THRESHOLD = 0.80
 
 TASKS = ["easy", "medium", "hard"]
 
@@ -180,7 +180,7 @@ def run_episode(client: OpenAI, task_id: str) -> float:
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
-    score = 0.1
+    score = 0.15
     success = False
 
     try:
@@ -201,8 +201,9 @@ def run_episode(client: OpenAI, task_id: str) -> float:
             error: Optional[str] = None
 
             # With the new server logic, 'reward' is already the incremental normalized delta
-            incremental_reward = reward
-            episode_score = compute_episode_score(env.state())
+            prev_score = score
+            score = compute_episode_score(env.state())
+            incremental_reward = round(score - prev_score, 4)
             
             rewards.append(incremental_reward)
             steps_taken = step

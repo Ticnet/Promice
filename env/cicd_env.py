@@ -110,6 +110,8 @@ def _build_observation(state: EnvironmentState) -> Observation:
         else 1.0
     )
     available_actions = list(range(8))  # all actions always available
+    task_score = compute_episode_score(state) if state.done else None
+    
     return Observation(
         pipeline_stage=state.pipeline_stage,
         failure_log=state.failure_log,
@@ -119,6 +121,7 @@ def _build_observation(state: EnvironmentState) -> Observation:
         step_count=state.step_count,
         pipeline_healthy=state.pipeline_healthy,
         progress_pct=round(progress_pct, 4),
+        task_score=task_score,
     )
 
 
@@ -261,6 +264,9 @@ class CICDRepairEnv:
 
         Returns:
             (observation, reward, done, info)
+
+            Note: The 'reward' returned is the raw step increment.
+            The 'info["cumulative_reward"]' is the normalized task score in [0.15, 0.85].
         """
         if self._state is None:
             raise RuntimeError("Call reset() before step().")
@@ -309,7 +315,7 @@ class CICDRepairEnv:
                         "action_taken":      action_id,
                         "action_correct":    False,
                         "intermittent_failure": True,
-                        "cumulative_reward": _clamp(state.cumulative_reward),
+                        "cumulative_reward": compute_episode_score(state),
                         "done":              state.done,
                         "pipeline_healthy":  state.pipeline_healthy,
                     }
@@ -376,7 +382,7 @@ class CICDRepairEnv:
             "sequence_position": state.sequence_position,
             "action_taken":      action_id,
             "action_correct":    (expected is not None and action_id == expected),
-            "cumulative_reward": _clamp(state.cumulative_reward),
+            "cumulative_reward": compute_episode_score(state),
             "done":              state.done,
             "pipeline_healthy":  state.pipeline_healthy,
         }

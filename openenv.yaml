@@ -182,6 +182,11 @@ observation_space:
       dtype: float
       range: [0.0, 1.0]
       description: "Fraction of the required repair sequence completed"
+    task_score:
+      dtype: float
+      nullable: true
+      range: [0.15, 0.85]
+      description: "Final normalised task score when the episode terminates"
 
 # ------------------------------------------------------------------
 # Reward Function
@@ -209,7 +214,7 @@ reward_function:
     - name: destructive_penalty
       value: -0.10
       condition: "rollback (5) or ignore_continue (7) used outside required sequence"
-  clamping: "cumulative_reward clamped to [0.0, 1.0] at episode end"
+  clamping: "raw_sum clamped to [0.0, 1.0], then mapped to [0.15, 0.85] for final task_score."
 
 # ------------------------------------------------------------------
 # Tasks (Tiers)

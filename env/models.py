@@ -128,6 +128,7 @@ class Observation(BaseModel):
     step_count:        int             = Field(..., ge=0, description="Number of steps taken so far.")
     pipeline_healthy:  bool            = Field(..., description="True only when pipeline is fully repaired.")
     progress_pct:      float           = Field(..., ge=0.0, le=1.0, description="Repair progress (0.0–1.0).")
+    task_score:        Optional[float] = Field(default=None, description="Final score when done, in range [0.15, 0.85]")
 
     model_config = {"frozen": True}
 

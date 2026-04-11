@@ -67,7 +67,7 @@ def grade_agent(
         procedural:    If True, use procedurally-generated logs.
 
     Returns:
-        Final normalised score in [0.1, 0.9].
+        Final normalised score in [0.15, 0.85].
     """
     if difficulty not in _DIFFICULTIES and difficulty not in _TIERS:
         raise ValueError(
