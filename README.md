@@ -1,18 +1,3 @@
----
-title: CICDRepairEnv
-emoji: 🔧
-colorFrom: indigo
-colorTo: gray
-sdk: docker
-app_file: server/app.py
-pinned: false
-tags:
-  - openenv
-  - reinforcement-learning
-  - devops
-  - automated-repair
----
-
 # CICDRepairEnv: The Professional Manual
 
 CICDRepairEnv is a rigorous, industrial-grade Reinforcement Learning (RL) environment designed to evaluate autonomous agents in the complex domain of CI/CD pipeline repair. It provides a standardized benchmark for diagnosing failures from unstructured logs and executing sequential remediation actions.
