@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Optional
+import uuid
+import time
+from dataclasses import dataclass, field
+from typing import Dict
 
-from fastapi import FastAPI, Request, Body
+from fastapi import FastAPI, Request, Body, HTTPException, Query
 from fastapi.responses import JSONResponse
 import gradio as gr
 import uvicorn
 
-# Ensure local env is importable
 # Ensure root components are importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -27,11 +29,39 @@ from grader import grade_all
 from run_baseline import baseline_agent
 
 # ---------------------------------------------------------------------------
-# Global Environment (Thread-safe-ish for single-agent evaluation)
+# Session Registry (replaces the old _SINGLETON_ENV)
 # ---------------------------------------------------------------------------
 
-_SINGLETON_ENV = CICDRepairEnv()
-_LAST_SCORE = 0.15  # Starting point of the [0.15, 0.85] range
+@dataclass
+class Session:
+    """An isolated environment instance bound to a session token."""
+    env: CICDRepairEnv
+    last_score: float = 0.01
+    created_at: float = field(default_factory=time.time)
+
+_SESSIONS: Dict[str, Session] = {}
+_MAX_SESSIONS = 100  # hard cap to prevent memory leaks
+
+
+def _create_session(env: CICDRepairEnv) -> str:
+    """Register a new session.  Evicts the oldest if at capacity."""
+    if len(_SESSIONS) >= _MAX_SESSIONS:
+        oldest_id = min(_SESSIONS, key=lambda k: _SESSIONS[k].created_at)
+        del _SESSIONS[oldest_id]
+    session_id = uuid.uuid4().hex[:12]
+    _SESSIONS[session_id] = Session(env=env)
+    return session_id
+
+
+def _get_session(session_id: str) -> Session:
+    """Look up a session or raise 404."""
+    if session_id not in _SESSIONS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Session '{session_id}' not found. Call /reset first.",
+        )
+    return _SESSIONS[session_id]
+
 
 # ---------------------------------------------------------------------------
 # FastAPI Endpoints (OpenEnv Headless API)
@@ -41,35 +71,36 @@ app = FastAPI(title="CICDRepairEnv API")
 
 @app.post("/reset")
 async def reset_api(payload: dict = Body({})):
-    """Reset the environment via API."""
+    """Reset the environment via API.  Returns a new session_id."""
     task_id = payload.get("task_id", "tier_1")
-    procedural = payload.get("procedural", False)
     sigma = payload.get("sigma", 0.0)
 
-    if sigma > 0:
-        _SINGLETON_ENV._stochastic = StochasticConfig(sigma=sigma)
-    else:
-        _SINGLETON_ENV._stochastic = StochasticConfig()
+    stochastic = StochasticConfig(sigma=sigma) if sigma > 0 else None
+    env = CICDRepairEnv(stochastic=stochastic)
+    obs = env.reset(task_id)
 
-    global _LAST_SCORE
-    obs = _SINGLETON_ENV.reset(task_id, procedural=procedural)
-    _LAST_SCORE = 0.15
-    return obs.model_dump()
+    session_id = _create_session(env)
+    return {"session_id": session_id, **obs.model_dump()}
 
 @app.post("/step")
 async def step_api(payload: dict = Body(...)):
-    """Apply an action via API."""
-    global _LAST_SCORE
+    """Apply an action via API.  Requires session_id."""
+    session_id = payload.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing 'session_id' in payload.")
+
+    session = _get_session(session_id)
     try:
         action_id = int(payload["action_id"])
         action = Action(action_id=action_id)
-        obs, _raw_reward, done, info = _SINGLETON_ENV.step(action)
-        
-        current_score = compute_episode_score(_SINGLETON_ENV.state())
-        incremental_reward = round(current_score - _LAST_SCORE, 4)
-        _LAST_SCORE = current_score
-        
+        obs, _raw_reward, done, info = session.env.step(action)
+
+        current_score = compute_episode_score(session.env.state())
+        incremental_reward = round(current_score - session.last_score, 4)
+        session.last_score = current_score
+
         return {
+            "session_id": session_id,
             "observation": obs.model_dump(),
             "reward": incremental_reward,
             "done": done,
@@ -79,17 +110,20 @@ async def step_api(payload: dict = Body(...)):
                 "incremental_reward": incremental_reward
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 @app.get("/state")
-async def state_api():
-    """Get internal state via API."""
+async def state_api(session_id: str = Query(...)):
+    """Get internal state via API.  Requires session_id query param."""
+    session = _get_session(session_id)
     try:
-        st = _SINGLETON_ENV.state()
+        st = session.env.state()
         state_data = st.model_dump()
         state_data["cumulative_reward"] = compute_episode_score(st)
-        return state_data
+        return {"session_id": session_id, **state_data}
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
@@ -104,10 +138,10 @@ async def health():
 def make_fresh_state():
     return {"env": CICDRepairEnv(), "history": [], "total_reward": 0.0, "done": False}
 
-def reset_episode(task_id: str, sigma: float, procedural: bool, session: dict) -> tuple:
+def reset_episode(task_id: str, sigma: float, session: dict) -> tuple:
     stochastic = StochasticConfig(sigma=sigma) if sigma > 0 else None
     env = CICDRepairEnv(stochastic=stochastic)
-    obs = env.reset(task_id, procedural=procedural)
+    obs = env.reset(task_id)
     session["env"] = env
     session["history"] = []
     session["total_reward"] = 0.0
@@ -168,14 +202,13 @@ def _render_state(state, session, last_reward, last_action):
 ACTION_CHOICES = [f"{aid}: {name}" for aid, name in ACTION_NAMES.items()]
 TIER_DESCRIPTIONS = {"easy": "Easy", "medium": "Medium", "hard": "Hard"}
 
-with gr.Blocks(title="CICDRepairEnv") as demo:
+with gr.Blocks(title="CICDRepairEnv", theme=gr.themes.Soft()) as demo:
     session_state = gr.State(make_fresh_state)
     gr.Markdown("# CICDRepairEnv\nPipeline repair RL environment.")
     with gr.Row():
         with gr.Column(scale=1):
             task_dropdown = gr.Dropdown(choices=list(TIER_DESCRIPTIONS.keys()), value="easy", label="Tier")
             sigma_slider = gr.Slider(0.0, 1.0, 0.0, step=0.05, label="Stochastic σ")
-            procedural_cb = gr.Checkbox(False, label="Procedural Logs")
             reset_btn = gr.Button("Reset Episode", variant="primary")
             action_dropdown = gr.Dropdown(choices=ACTION_CHOICES, value=ACTION_CHOICES[0], label="Action")
             step_btn = gr.Button("▶️ Take Action", variant="secondary")
@@ -188,10 +221,10 @@ with gr.Blocks(title="CICDRepairEnv") as demo:
             action_feedback = gr.Markdown()
             history_display = gr.Markdown()
 
-    reset_btn.click(reset_episode, [task_dropdown, sigma_slider, procedural_cb, session_state], [log_display, info_display, hints_display, action_feedback, history_display, session_state])
+    reset_btn.click(reset_episode, [task_dropdown, sigma_slider, session_state], [log_display, info_display, hints_display, action_feedback, history_display, session_state])
     step_btn.click(take_action, [action_dropdown, session_state], [log_display, info_display, hints_display, action_feedback, history_display, session_state])
     baseline_btn.click(run_baseline_all, [session_state], [baseline_output])
-    demo.load(reset_episode, [task_dropdown, sigma_slider, procedural_cb, session_state], [log_display, info_display, hints_display, action_feedback, history_display, session_state])
+    demo.load(reset_episode, [task_dropdown, sigma_slider, session_state], [log_display, info_display, hints_display, action_feedback, history_display, session_state])
 
 # ---------------------------------------------------------------------------
 # Main Entry Point
