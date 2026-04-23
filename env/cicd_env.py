@@ -44,26 +44,26 @@ from env.procedural import generate_log, generate_noise_line, generate_memory_hi
 def normalize_score(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     """
     Normalise a raw reward/score into the strict OpenEnv (0, 1) exclusive range.
-    Formula: 0.15 + (clamped_raw * 0.7)  →  range [0.15, 0.85]
-    
+    Formula: 0.01 + (clamped_raw * 0.98)  →  range [0.01, 0.99]
+
     This range is strictly within (0, 1), satisfying Phase 2 validation.
     """
     clamped_raw = max(lo, min(hi, value))
-    return round(0.15 + (clamped_raw * 0.7), 4)
+    return round(0.01 + (clamped_raw * 0.98), 4)
 
 
 def normalize_step_reward(raw: float) -> float:
     """
-    Map raw step rewards (approx [-0.2, 1.2]) to a safe (0.1, 0.9) range.
+    Map raw step rewards (approx [-0.2, 1.2]) to a safe (0.01, 0.99) range.
     Ensures no negative rewards are logged, satisfying Phase 2 validation.
     """
     clamped = max(-0.2, min(1.2, raw))
-    return round(0.1 + ((clamped + 0.2) / 1.4) * 0.8, 4)
+    return round(0.01 + ((clamped + 0.2) / 1.4) * 0.98, 4)
 
 
 def compute_episode_score(state: EnvironmentState) -> float:
     """
-    Multi-component weighted episode score, strictly mapped to [0.15, 0.85].
+    Multi-component weighted episode score, strictly mapped to [0.01, 0.99].
 
     Components (weights sum to 1.0):
         success    (0.40): 1.0 if pipeline fully repaired, else 0.0
@@ -189,15 +189,16 @@ class CICDRepairEnv:
     def reset(
         self,
         task_id: str = "tier_1",
-        *,
-        procedural: bool = False,
     ) -> Observation:
         """
         Reset the environment for the given task.
 
+        Logs are always procedurally generated. When sigma=0 (deterministic
+        mode), a fixed default seed of 42 is used so that logs are
+        repeatable across runs.
+
         Args:
             task_id:     One of "tier_1", "tier_2", "tier_3" (or legacy "easy"/"medium"/"hard").
-            procedural:  If True, generate a fresh log using the procedural engine.
 
         Returns:
             Initial observation.
@@ -214,22 +215,20 @@ class CICDRepairEnv:
 
         # Initialise per-episode RNG
         seed = self._stochastic.seed
-        if seed is None and self._stochastic.sigma > 0:
-            seed = random.randint(0, 2**31 - 1)
+        if seed is None:
+            # Deterministic default when sigma=0; random when stochastic
+            seed = 42 if self._stochastic.sigma == 0 else random.randint(0, 2**31 - 1)
         self._rng = random.Random(seed)
 
-        # Determine failure log
-        if procedural and task.get("procedural", False):
-            failure_log = generate_log(
-                canonical_id,
-                self._rng,
-                inject_noise=(self._stochastic.sigma > 0),
-            )
-        else:
-            failure_log = task["failure_log"]
+        # Always generate procedural logs
+        failure_log = generate_log(
+            canonical_id,
+            self._rng,
+            inject_noise=(self._stochastic.sigma > 0),
+        )
 
-        # Determine memory hints / bank (procedural for tier_3)
-        if procedural and canonical_id == "tier_3":
+        # Always generate procedural memory hints for tier_3
+        if canonical_id == "tier_3":
             memory_hints, memory_bank = generate_memory_hints_tier3(self._rng)
         else:
             memory_hints = list(task["memory_hints"])
@@ -277,7 +276,7 @@ class CICDRepairEnv:
             (observation, reward, done, info)
 
             Note: The 'reward' returned is the raw step increment.
-            The 'info["cumulative_reward"]' is the normalized task score in [0.15, 0.85].
+            The 'info["cumulative_reward"]' is the normalized task score in [0.01, 0.99].
         """
         if self._state is None:
             raise RuntimeError("Call reset() before step().")
@@ -289,10 +288,6 @@ class CICDRepairEnv:
         rc = self._reward_cfg
         action_id = int(action.action_id)
         step_reward: float = 0.0
-
-        # 1. Increment step count
-        state.step_count += 1
-        state.repair_sequence_taken.append(action_id)
 
         # ── Stochastic: action corruption ──────────────────────────
         if sigma > 0:
@@ -315,28 +310,28 @@ class CICDRepairEnv:
             if sigma > 0:
                 ifail_prob = sigma * self._stochastic.intermittent_failure_prob
                 if self._rng.random() < ifail_prob:
-                    # Transient failure — no progress, no penalty
-                    # Just skip the reward but don't penalise
-                    state.efficiency_eligible = False
-                    # Fall through to timeout check
+                    # Transient failure — the step is NOT consumed.
+                    # The agent's action was correct but infrastructure
+                    # flaked (e.g. pip timeout).  Do not penalise
+                    # efficiency and do not increment step_count.
                     obs = _build_observation(state)
                     info: dict = {
                         "step_count":        state.step_count,
                         "sequence_position": state.sequence_position,
                         "action_taken":      action_id,
-                        "action_correct":    False,
+                        "action_correct":    True,
                         "intermittent_failure": True,
                         "cumulative_reward": compute_episode_score(state),
                         "done":              state.done,
                         "pipeline_healthy":  state.pipeline_healthy,
                     }
-                    # Check timeout
-                    if not state.done and state.step_count >= state.max_steps:
-                        state.done = True
-                        info["done"] = True
                     return obs, 0.0, state.done, info
 
             # ---- CORRECT action ----------------------------------------
+            # Step is consumed only when it actually executes
+            state.step_count += 1
+            state.repair_sequence_taken.append(action_id)
+
             # Progress reward: distributed evenly across sequence
             progress_reward = rc.progress_total / seq_len
             step_reward += progress_reward
@@ -364,6 +359,9 @@ class CICDRepairEnv:
 
         else:
             # ---- WRONG action ------------------------------------------
+            # Step is consumed
+            state.step_count += 1
+            state.repair_sequence_taken.append(action_id)
             state.efficiency_eligible = False
 
             # Destructive penalty
