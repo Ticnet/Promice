@@ -52,7 +52,6 @@ def grade_agent(
     *,
     stochastic: StochasticConfig | None = None,
     reward_config: RewardConfig | None = None,
-    procedural: bool = False,
 ) -> float:
     """
     Run a single episode of the given difficulty and return the final score.
@@ -64,10 +63,9 @@ def grade_agent(
         difficulty:    Tier ID ("tier_1"/"tier_2"/"tier_3") or alias ("easy"/"medium"/"hard").
         stochastic:    Optional stochastic config (sigma > 0 for noisy episodes).
         reward_config: Optional reward weight overrides.
-        procedural:    If True, use procedurally-generated logs.
 
     Returns:
-        Final normalised score in [0.15, 0.85].
+        Final normalised score in [0.01, 0.99].
     """
     if difficulty not in _DIFFICULTIES and difficulty not in _TIERS:
         raise ValueError(
@@ -75,7 +73,7 @@ def grade_agent(
         )
 
     env = CICDRepairEnv(stochastic=stochastic, reward_config=reward_config)
-    obs = env.reset(difficulty, procedural=procedural)
+    obs = env.reset(difficulty)
 
     try:
         while True:
@@ -96,7 +94,6 @@ def grade_all(
     *,
     stochastic: StochasticConfig | None = None,
     reward_config: RewardConfig | None = None,
-    procedural: bool = False,
 ) -> dict[str, float]:
     """
     Run the agent on all three difficulties and return a summary.
@@ -110,7 +107,6 @@ def grade_all(
             agent_fn, difficulty,
             stochastic=stochastic,
             reward_config=reward_config,
-            procedural=procedural,
         )
 
     results["average"] = round(

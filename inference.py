@@ -44,7 +44,7 @@ API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or ""
 
 BENCHMARK   = "CICDRepairEnv"
 MAX_STEPS   = 10            # hard cap per episode
-MAX_TOTAL_REWARD = 0.85
+MAX_TOTAL_REWARD = 0.99
 SUCCESS_SCORE_THRESHOLD = 0.80
 
 TASKS = ["easy", "medium", "hard"]
@@ -183,7 +183,7 @@ def run_episode(client: OpenAI, task_id: str, seed: int = 42) -> dict:
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
-    score = 0.15
+    score = 0.01
     success = False
 
 

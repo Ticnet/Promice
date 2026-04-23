@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Verify core imports at build time
-RUN python -c "from env import CICDRepairEnv, Action, Observation, EnvironmentState; env = CICDRepairEnv(); obs = env.reset('tier_1'); print('env imports OK'); print('reset stage:', obs.pipeline_stage)"
+RUN python -c "from env import CICDRepairEnv, Action, Observation, EnvironmentState; env = CICDRepairEnv(); obs = env.reset('tier_1'); print('env imports OK'); print('log length:', len(obs.failure_log))"
 
 # Verify inference script is importable
 RUN python -c "import inference; print('inference.py importable')"

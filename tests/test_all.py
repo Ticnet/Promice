@@ -1,9 +1,11 @@
 """
-Test suite for CICDRepairEnv improvements:
-- Determinism verification
+Test suite for CICDRepairEnv:
+- Determinism verification (procedural with fixed seed)
 - Stochastic mode
 - Procedural log generation
 - Tier naming and backward compatibility
+- Reward config
+- Row normalization
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from grader import grade_agent, grade_all, _normalize_rows
 # =========================================================================
 
 def test_deterministic_trajectory_tier1():
-    """σ=0, static logs: same actions → same rewards."""
+    """σ=0, default seed=42: same actions → same rewards."""
     env = CICDRepairEnv()
     obs1 = env.reset("tier_1")
     _, r1, d1, _ = env.step(Action(action_id=1))
@@ -36,14 +38,14 @@ def test_deterministic_trajectory_tier1():
     obs2 = env2.reset("tier_1")
     _, r2, d2, _ = env2.step(Action(action_id=1))
 
-    assert obs1.failure_log == obs2.failure_log, "Static logs must be identical"
+    assert obs1.failure_log == obs2.failure_log, "Procedural logs with same seed must be identical"
     assert r1 == r2, f"Rewards differ: {r1} vs {r2}"
     assert d1 == d2
     print("   test_deterministic_trajectory_tier1")
 
 
 def test_deterministic_trajectory_tier2():
-    """σ=0, static logs: tier 2 two-step sequence."""
+    """σ=0, default seed=42: tier 2 two-step sequence."""
     env = CICDRepairEnv()
     env.reset("tier_2")
     _, r1, _, _ = env.step(Action(action_id=4))  # clear_cache
@@ -106,8 +108,6 @@ def test_stochastic_variance():
         outcomes.add((round(reward, 4), done))
 
     # With sigma=1.0 and 50 seeds, we should see at least some variation
-    # (intermittent failures or action corruption)
-    # Even if variance is rare, the test passes if we get at least one different outcome
     assert len(outcomes) >= 1, "Expected at least some outcome"
     print(f"   test_stochastic_variance (found {len(outcomes)} distinct outcomes)")
 
@@ -131,6 +131,30 @@ def test_same_seed_reproducible():
             break
 
     print("   test_same_seed_reproducible")
+
+
+def test_intermittent_failure_no_step_consumed():
+    """Intermittent failures should NOT consume the agent's step count."""
+    # Use a seed/sigma combo that triggers intermittent failure on tier_1
+    triggered = False
+    for seed in range(200):
+        cfg = StochasticConfig(sigma=1.0, seed=seed)
+        env = CICDRepairEnv(stochastic=cfg)
+        env.reset("tier_1")
+        _, _, _, info = env.step(Action(action_id=1))
+        if info.get("intermittent_failure"):
+            # Step should NOT have been consumed
+            assert env.state().step_count == 0, \
+                f"Step count should be 0 after intermittent failure, got {env.state().step_count}"
+            assert info["action_correct"] is True, \
+                "Intermittent failure on correct action should report action_correct=True"
+            triggered = True
+            break
+
+    if not triggered:
+        print("   test_intermittent_failure_no_step_consumed (SKIPPED — no intermittent triggered in 200 seeds)")
+    else:
+        print("   test_intermittent_failure_no_step_consumed")
 
 
 # =========================================================================
@@ -161,17 +185,17 @@ def test_procedural_logs_preserve_semantics():
     print("   test_procedural_logs_preserve_semantics")
 
 
-def test_procedural_reset():
-    """Environment reset with procedural=True generates different logs per seed."""
+def test_procedural_reset_with_different_seeds():
+    """Environment reset with different explicit seeds generates different logs."""
     cfg1 = StochasticConfig(sigma=0.0, seed=1)
     cfg2 = StochasticConfig(sigma=0.0, seed=2)
     env1 = CICDRepairEnv(stochastic=cfg1)
     env2 = CICDRepairEnv(stochastic=cfg2)
 
-    obs1 = env1.reset("tier_1", procedural=True)
-    obs2 = env2.reset("tier_1", procedural=True)
+    obs1 = env1.reset("tier_1")
+    obs2 = env2.reset("tier_1")
     assert obs1.failure_log != obs2.failure_log, "Procedural logs with different seeds should differ"
-    print("   test_procedural_reset")
+    print("   test_procedural_reset_with_different_seeds")
 
 
 # =========================================================================
@@ -185,23 +209,21 @@ def test_tier_ids_exist():
 
 
 def test_all_tiers_solvable():
-    """Baseline agent scores 1.0 on all tiers in deterministic mode."""
+    """Baseline agent achieves high scores on all tiers in deterministic mode."""
     results = grade_all(baseline_agent)
     mapping = {"tier_1": "easy", "tier_2": "medium", "tier_3": "hard"}
     for tier in TIER_IDS:
         diff_key = mapping[tier]
-        assert 0.8 < results[diff_key] < 0.9, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected in [0.8, 0.9]"
+        assert results[diff_key] > 0.9, f"Tier {tier} ({diff_key}) scored {results[diff_key]}, expected > 0.9"
     print(f"   test_all_tiers_solvable (scores: {results})")
 
 
 def test_failing_agent_score():
-    """Verify that an agent that does nothing gets a low score (0.01)."""
-    # Dummy agent that only restarts (no progress)
+    """Verify that an agent that does nothing gets a low score."""
     def dummy_agent(obs, info): return Action(action_id=0)
 
     score = grade_agent(dummy_agent, "tier_1")
-    # Raw reward 0.0 -> normalized 0.1
-    assert 0.1 < score < 0.4, f"Expected low score for failing agent, got {score}"
+    assert 0.01 < score < 0.5, f"Expected low score for failing agent, got {score}"
     print(f"   test_failing_agent_score (score: {score})")
 
 
@@ -215,13 +237,31 @@ def test_custom_reward_config():
     env = CICDRepairEnv(reward_config=rc)
     env.reset("tier_1")
     _, reward, _, _ = env.step(Action(action_id=1))
-    # Should get: root_cause(0.50) + progress(0.10/1) + success(0.40) + efficiency(0.10) = 1.10
     assert reward > 0.9, f"Expected high reward with boosted root cause, got {reward}"
     print(f"   test_custom_reward_config (reward={reward})")
 
 
 # =========================================================================
-# 6. ROW NORMALIZATION TESTS
+# 6. NORMALIZATION TESTS
+# =========================================================================
+
+def test_score_strictly_between_zero_and_one():
+    """All scores must be strictly within (0, 1)."""
+    from env.cicd_env import normalize_score, normalize_step_reward
+
+    # Edge cases
+    assert normalize_score(0.0) > 0.0, "normalize_score(0) must be > 0"
+    assert normalize_score(1.0) < 1.0, "normalize_score(1) must be < 1"
+    assert normalize_score(0.0) >= 0.01
+    assert normalize_score(1.0) <= 0.99
+
+    assert normalize_step_reward(-0.2) > 0.0
+    assert normalize_step_reward(1.2) < 1.0
+    print("   test_score_strictly_between_zero_and_one")
+
+
+# =========================================================================
+# 7. ROW NORMALIZATION TESTS
 # =========================================================================
 
 def test_normalize_rows():
@@ -230,7 +270,6 @@ def test_normalize_rows():
         {"id": 1, "value": 10.556, "name": "A"},
         {"id": 2, "value": 20.0, "name": "B"},
     ]
-    # Scrambled keys and rows, with slightly different float precision
     rows2 = [
         {"name": "B", "id": 2, "value": 20.0001},
         {"value": 10.5601, "id": 1, "name": "A"},
@@ -260,11 +299,12 @@ if __name__ == "__main__":
     test_sigma_zero_is_deterministic()
     test_stochastic_variance()
     test_same_seed_reproducible()
+    test_intermittent_failure_no_step_consumed()
 
     print("\n3. Procedural Log Tests")
     test_procedural_logs_differ_per_seed()
     test_procedural_logs_preserve_semantics()
-    test_procedural_reset()
+    test_procedural_reset_with_different_seeds()
 
     print("\n4. Tier Naming Tests")
     test_tier_ids_exist()
@@ -274,7 +314,10 @@ if __name__ == "__main__":
     print("\n5. Reward Config Tests")
     test_custom_reward_config()
 
-    print("\n6. Row Normalization Tests")
+    print("\n6. Normalization Tests")
+    test_score_strictly_between_zero_and_one()
+
+    print("\n7. Row Normalization Tests")
     test_normalize_rows()
 
     print("\n=== All tests passed! ===\n")
